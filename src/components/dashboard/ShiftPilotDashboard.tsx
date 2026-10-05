@@ -20,6 +20,7 @@ import {
   Wallet,
 } from "lucide-react"
 import { CalendarPanel } from "@/components/calendar/CalendarPanel"
+import { ReplacementPeopleManager } from "@/components/calendar/ReplacementPeopleManager"
 import { DebtSummaryCard } from "@/components/debt/DebtSummaryCard"
 import { QuickAddDialog } from "@/components/calendar/QuickAddDialog"
 import { SomaAnnualPlanForm } from "@/components/calendar/SomaAnnualPlanForm"
@@ -367,6 +368,7 @@ export function ShiftPilotDashboard() {
           </div>
 
           <SomaAnnualPlanForm />
+          <ReplacementPeopleManager />
 
           <footer className="dashboard-footer">
             <span>

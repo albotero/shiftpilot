@@ -909,8 +909,8 @@ a {
 .day-entry.other-shift,
 .legend-swatch.other-shift,
 .upcoming-mark.other-shift {
-  background: #176b59;
-  color: white;
+  background: #a8cfb8;
+  color: var(--ink);
 }
 
 .day-entry.borrowed-shift,
@@ -935,6 +935,47 @@ a {
 .day-entry.reservation {
   background: #e9e3ff;
   color: #4e4484;
+}
+
+.entry-dot.reservation-r1,
+.upcoming-mark.reservation-r1,
+.day-entry.reservation-r1 {
+  background: #777097;
+}
+
+.entry-dot.reservation-r2,
+.upcoming-mark.reservation-r2,
+.day-entry.reservation-r2 {
+  background: #9b92b2;
+}
+
+.entry-dot.reservation-r3,
+.upcoming-mark.reservation-r3,
+.day-entry.reservation-r3 {
+  background: #aea7c2;
+}
+
+.entry-dot.reservation-r4,
+.upcoming-mark.reservation-r4,
+.day-entry.reservation-r4 {
+  background: #bdb8cd;
+}
+
+.entry-dot.reservation-r5,
+.upcoming-mark.reservation-r5,
+.day-entry.reservation-r5 {
+  background: #cac5d7;
+}
+
+.day-entry.reservation-r1 {
+  color: #fff;
+}
+
+.day-entry.reservation-r2,
+.day-entry.reservation-r3,
+.day-entry.reservation-r4,
+.day-entry.reservation-r5 {
+  color: var(--ink);
 }
 
 .day-entry.sedarte {
@@ -1187,6 +1228,26 @@ a {
 
 .upcoming-mark.reservation {
   background: var(--lilac);
+}
+
+.upcoming-mark.reservation-r1 {
+  background: #777097;
+}
+
+.upcoming-mark.reservation-r2 {
+  background: #9b92b2;
+}
+
+.upcoming-mark.reservation-r3 {
+  background: #aea7c2;
+}
+
+.upcoming-mark.reservation-r4 {
+  background: #bdb8cd;
+}
+
+.upcoming-mark.reservation-r5 {
+  background: #cac5d7;
 }
 
 .upcoming-mark.sedarte {
@@ -1549,6 +1610,133 @@ a {
 .annual-plan-actions {
   display: flex;
   justify-content: flex-end;
+}
+
+.replacement-people-panel {
+  display: grid;
+  gap: 13px;
+  margin-top: 12px;
+  padding: 17px;
+  border: 1px solid #e3e8e1;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.replacement-people-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.replacement-people-heading h2 {
+  margin: 0;
+  color: #24332f;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.replacement-people-heading .eyebrow {
+  margin-bottom: 3px;
+}
+
+.replacement-add-button {
+  margin-left: auto;
+}
+
+.replacement-person-form {
+  display: grid;
+  gap: 11px;
+  padding: 13px;
+  border: 1px solid #e3e8e1;
+  border-radius: 6px;
+  background: #f8faf7;
+}
+
+.replacement-person-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.replacement-person-actions,
+.replacement-person-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.replacement-people-list {
+  display: grid;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.replacement-people-list li {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 7px 2px;
+  border-top: 1px solid #edf0eb;
+}
+
+.replacement-people-list li.inactive {
+  opacity: 0.62;
+}
+
+.replacement-person-copy {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+}
+
+.replacement-person-copy strong {
+  overflow: hidden;
+  color: #263630;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.replacement-person-copy span,
+.replacement-people-empty,
+.replacement-people-message {
+  color: #758078;
+  font-size: 9px;
+}
+
+.replacement-person-row-actions {
+  margin-left: auto;
+}
+
+.replacement-person-row-actions .icon-button {
+  width: 30px;
+  height: 30px;
+}
+
+.replacement-person-row-actions .danger {
+  color: #9c4c3d;
+}
+
+.replacement-people-empty,
+.replacement-people-message {
+  margin: 0;
+}
+
+.replacement-people-message {
+  color: #477449;
+}
+
+.replacement-people-hint {
+  margin: -3px 0 0;
+  color: #758078;
+  font-size: 10px;
+}
+
+.replacement-people-hint a {
+  color: #477449;
+  font-weight: 650;
 }
 
 .dashboard-footer b {
@@ -2139,6 +2327,18 @@ a {
 
   .annual-plan-panel {
     padding: 13px;
+  }
+
+  .replacement-people-panel {
+    padding: 13px;
+  }
+
+  .replacement-person-fields {
+    grid-template-columns: 1fr;
+  }
+
+  .replacement-people-heading h2 {
+    font-size: 13px;
   }
 
   .annual-plan-grid {

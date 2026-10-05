@@ -26,6 +26,18 @@ describe("calendar availability", () => {
     expect(getDayAvailability([], "2026-10-05")).toBe("LIBRE")
   })
 
+  it("assigns progressively lighter tones from R1 through R5", () => {
+    const statuses = ["R1", "R2", "R3", "R4", "R5"] as const
+
+    expect(statuses.map((status) => getEntryTone({ ...reservedShift, status }))).toEqual([
+      "reservation-r1",
+      "reservation-r2",
+      "reservation-r3",
+      "reservation-r4",
+      "reservation-r5",
+    ])
+  })
+
   it("marks an in-person Soma shift as occupied", () => {
     expect(getDayAvailability([{ ...reservedShift, status: "TURNO" }], "2026-10-05")).toBe("OCUPADO")
   })

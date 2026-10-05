@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, type FormEvent } from "react"
+import { useEffect, useState, type FormEvent } from "react"
 import { RotateCcw, Trash2, X } from "lucide-react"
 import { calendarEntrySchema } from "@/lib/calendar/schema"
 import { toDateKey } from "@/lib/calendar/utils"
@@ -14,6 +14,8 @@ type QuickAddDialogProps = {
   onSave: (entry: CalendarEntry) => Promise<void>
   onDelete?: (entry: CalendarEntry) => Promise<void>
 }
+
+type ReplacementPerson = { id: string; name: string; active: boolean }
 
 const shiftStatuses: SomaStatus[] = [
   "R5",
@@ -60,7 +62,11 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
   const [hasTime, setHasTime] = useState(initialEntry?.kind === "SEDARTE" || Boolean(initialEntry?.startTime))
   const [location, setLocation] = useState(initialEntry?.location ?? "")
   const [notes, setNotes] = useState(initialEntry?.notes ?? "")
-  const [anesthesiologist, setAnesthesiologist] = useState(initialEntry?.anesthesiologist ?? "")
+  const [replacementPersonId, setReplacementPersonId] = useState(initialEntry?.replacementPersonId ?? "")
+  const [amReplacementPersonId, setAmReplacementPersonId] = useState("")
+  const [pmReplacementPersonId, setPmReplacementPersonId] = useState("")
+  const [replacementPeople, setReplacementPeople] = useState<ReplacementPerson[]>([])
+  const [loadingReplacementPeople, setLoadingReplacementPeople] = useState(true)
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
@@ -72,6 +78,26 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
   const canRestoreRotation = Boolean(initialEntry?.kind === "SOMA" && initialEntry.manualOverride)
   const isCoverageStatus = status === "TURNO_OTRA_PERSONA" || status === "TURNO_DE_OTRA_PERSONA"
 
+  useEffect(() => {
+    if (!isCoverageStatus) return
+    let active = true
+    fetch("/api/replacement-people?includeInactive=true", { cache: "no-store" })
+      .then(async (response) => {
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error ?? "No se pudo cargar el catálogo.")
+        if (active) setReplacementPeople(result as ReplacementPerson[])
+      })
+      .catch((loadError) => {
+        if (active) setError(loadError instanceof Error ? loadError.message : "No se pudo cargar el catálogo.")
+      })
+      .finally(() => {
+        if (active) setLoadingReplacementPeople(false)
+      })
+    return () => {
+      active = false
+    }
+  }, [isCoverageStatus])
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (kind === "SOMA" && !shiftStatuses.includes(status)) {
@@ -81,6 +107,14 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
     if (kind === "VACACIONES" && (!Number.isInteger(vacationWeeks) || vacationWeeks < 1 || !date)) {
       setError("Indica una fecha inicial y una o más semanas completas.")
       return
+    }
+    if (kind === "SOMA" && isCoverageStatus) {
+      const selectedAmPersonId = amReplacementPersonId || replacementPersonId
+      const selectedPmPersonId = pmReplacementPersonId || replacementPersonId
+      if (period === "AM + PM" ? !selectedAmPersonId || !selectedPmPersonId : !replacementPersonId) {
+        setError("Selecciona el anestesiólogo para cada jornada cubierta.")
+        return
+      }
     }
 
     let vacationEndDate: string | undefined
@@ -102,7 +136,14 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
         ? {
             status,
             period,
-            ...(isCoverageStatus && anesthesiologist.trim() ? { anesthesiologist: anesthesiologist.trim() } : {}),
+            ...(isCoverageStatus && period === "AM + PM"
+              ? {
+                  amReplacementPersonId: amReplacementPersonId || replacementPersonId,
+                  pmReplacementPersonId: pmReplacementPersonId || replacementPersonId,
+                }
+              : isCoverageStatus && replacementPersonId
+                ? { replacementPersonId }
+                : {}),
           }
         : {}),
       title:
@@ -231,16 +272,70 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
                   </select>
                 </label>
               </div>
-              {isCoverageStatus && (
-                <label className="form-field">
-                  <span>{status === "TURNO_OTRA_PERSONA" ? "¿Quién te cubre?" : "¿De quién es el turno?"}</span>
-                  <input
-                    value={anesthesiologist}
-                    onChange={(event) => setAnesthesiologist(event.target.value)}
-                    maxLength={100}
-                    placeholder="Nombre del anestesiólogo"
-                  />
-                </label>
+              {isCoverageStatus &&
+                (period === "AM + PM" ? (
+                  <div className="form-row">
+                    {(["AM", "PM"] as const).map((half) => (
+                      <label className="form-field" key={half}>
+                        <span>
+                          {half} · {status === "TURNO_OTRA_PERSONA" ? "¿Quién te cubre?" : "¿De quién es el turno?"}
+                        </span>
+                        <select
+                          value={
+                            half === "AM"
+                              ? amReplacementPersonId || replacementPersonId
+                              : pmReplacementPersonId || replacementPersonId
+                          }
+                          disabled={loadingReplacementPeople}
+                          onChange={(event) => {
+                            if (half === "AM") setAmReplacementPersonId(event.target.value)
+                            else setPmReplacementPersonId(event.target.value)
+                          }}
+                          required
+                        >
+                          <option value="">Selecciona anestesiólogo</option>
+                          {replacementPeople
+                            .filter(
+                              (person) =>
+                                person.active ||
+                                person.id ===
+                                  (half === "AM"
+                                    ? amReplacementPersonId || replacementPersonId
+                                    : pmReplacementPersonId || replacementPersonId),
+                            )
+                            .map((person) => (
+                              <option key={person.id} value={person.id}>
+                                {person.name}
+                              </option>
+                            ))}
+                        </select>
+                      </label>
+                    ))}
+                  </div>
+                ) : (
+                  <label className="form-field">
+                    <span>{status === "TURNO_OTRA_PERSONA" ? "¿Quién te cubre?" : "¿De quién es el turno?"}</span>
+                    <select
+                      value={replacementPersonId}
+                      disabled={loadingReplacementPeople}
+                      onChange={(event) => setReplacementPersonId(event.target.value)}
+                      required
+                    >
+                      <option value="">Selecciona anestesiólogo</option>
+                      {replacementPeople
+                        .filter((person) => person.active || person.id === replacementPersonId)
+                        .map((person) => (
+                          <option key={person.id} value={person.id}>
+                            {person.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                ))}
+              {isCoverageStatus && !loadingReplacementPeople && replacementPeople.every((person) => !person.active) && (
+                <p className="replacement-people-hint">
+                  No hay anestesiólogos activos. <a href="#settings">Agrégalos en Configuración.</a>
+                </p>
               )}
             </>
           )}

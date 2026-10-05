@@ -28,6 +28,9 @@ export type CalendarEntry = {
   isFallback?: boolean
   manualOverride?: boolean
   annualPlanYear?: number
+  replacementPersonId?: string
+  amReplacementPersonId?: string
+  pmReplacementPersonId?: string
   anesthesiologist?: string
   title: string
   startTime?: string

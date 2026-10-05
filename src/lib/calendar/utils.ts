@@ -118,6 +118,11 @@ export function getEntryTone(entry: CalendarEntry) {
   if (entry.status === "EXTERNO") return "external"
   if (entry.status === "EXTERNO_NOCHE") return "external-night"
   if (entry.status === "LIBRE") return "free"
+  if (entry.status === "R1") return "reservation-r1"
+  if (entry.status === "R2") return "reservation-r2"
+  if (entry.status === "R3") return "reservation-r3"
+  if (entry.status === "R4") return "reservation-r4"
+  if (entry.status === "R5") return "reservation-r5"
   return "reservation"
 }
 

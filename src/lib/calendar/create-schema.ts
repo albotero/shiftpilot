@@ -23,6 +23,9 @@ export const createCalendarEntrySchema = z
       ])
       .optional(),
     anesthesiologist: z.string().trim().max(100).optional(),
+    replacementPersonId: z.string().min(1).optional(),
+    amReplacementPersonId: z.string().min(1).optional(),
+    pmReplacementPersonId: z.string().min(1).optional(),
     period: z.enum(["AM", "PM", "AM + PM", "NOCHE"]).optional(),
     title: z.string().trim().max(80),
     startTime: z

@@ -11,6 +11,14 @@ const { prismaMock } = vi.hoisted(() => ({
       delete: vi.fn(),
       createMany: vi.fn(),
     },
+    replacementPerson: {
+      findMany: vi.fn(),
+      findFirst: vi.fn(),
+      findUnique: vi.fn(),
+      create: vi.fn(),
+      update: vi.fn(),
+      delete: vi.fn(),
+    },
     appSetting: { findMany: vi.fn(), findUnique: vi.fn(), upsert: vi.fn() },
     event: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     vacation: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
@@ -20,7 +28,8 @@ const { prismaMock } = vi.hoisted(() => ({
 
 vi.mock("@/server/db", () => ({ prisma: prismaMock }))
 
-import { DELETE, POST } from "./route"
+import { DELETE, PATCH, POST } from "./route"
+import { DELETE as deletePerson, GET as getPeople, POST as createPerson } from "../replacement-people/route"
 import { PUT as saveAnnualPlan } from "../soma/annual-plan/route"
 
 const somaWork = { id: "soma-work", name: "Soma" }
@@ -73,6 +82,100 @@ beforeEach(() => {
 })
 
 describe("Soma calendar route integration", () => {
+  it("preserves an inactive catalog person on their existing covered shift", async () => {
+    const inactivePerson = { id: "person-inactive", name: "Ana histórica", active: false }
+    const coveredShift = {
+      ...automaticNight,
+      id: "covered-am",
+      period: "AM",
+      status: "TURNO_OTRA_PERSONA",
+      manualOverride: true,
+      anesthesiologist: inactivePerson.name,
+      coverages: [{ personId: inactivePerson.id }],
+    }
+    prismaMock.replacementPerson.findUnique.mockResolvedValue(inactivePerson)
+    prismaMock.shift.findUnique.mockResolvedValue({ ...coveredShift, work: somaWork })
+    prismaMock.shift.findMany.mockResolvedValue([coveredShift])
+    prismaMock.shift.update.mockImplementation(async ({ where, data }: { where: { id: string }; data: object }) => ({
+      ...coveredShift,
+      ...data,
+      id: where.id,
+      coverages: [{ person: inactivePerson }],
+    }))
+
+    const response = await PATCH(
+      new Request("http://localhost/api/calendar", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: coveredShift.id,
+          date: "2026-10-01",
+          kind: "SOMA",
+          status: "TURNO_OTRA_PERSONA",
+          period: "AM",
+          replacementPersonId: inactivePerson.id,
+          title: "Cubierto",
+        }),
+      }),
+    )
+    const entries = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(entries).toMatchObject([{ replacementPersonId: inactivePerson.id, anesthesiologist: inactivePerson.name }])
+  })
+
+  it("assigns different catalog anesthesiologists to AM and PM coverage rows", async () => {
+    const people = [
+      { id: "person-am", name: "Ana AM", active: true },
+      { id: "person-pm", name: "Beto PM", active: true },
+    ]
+    prismaMock.replacementPerson.findUnique.mockImplementation(
+      async ({ where }: { where: { id: string } }) => people.find((person) => person.id === where.id) ?? null,
+    )
+    prismaMock.shift.create.mockImplementation(
+      async ({
+        data,
+      }: {
+        data: {
+          period: string
+          coverages?: { create?: { person?: { connect?: { id?: string } } } }
+        }
+      }) => {
+        const personId = data.coverages?.create?.person?.connect?.id
+        const person = people.find((candidate) => candidate.id === personId)
+        return {
+          ...automaticNight,
+          ...data,
+          id: `shift-${data.period}`,
+          coverages: person ? [{ person }] : [],
+        }
+      },
+    )
+
+    const response = await POST(
+      jsonRequest({
+        id: "combined-coverage",
+        date: "2026-10-01",
+        kind: "SOMA",
+        status: "TURNO_OTRA_PERSONA",
+        period: "AM + PM",
+        amReplacementPersonId: "person-am",
+        pmReplacementPersonId: "person-pm",
+        title: "Cubierto",
+      }),
+    )
+    const entries = await response.json()
+
+    expect(response.status).toBe(201)
+    expect(entries).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ period: "AM", replacementPersonId: "person-am", anesthesiologist: "Ana AM" }),
+        expect.objectContaining({ period: "PM", replacementPersonId: "person-pm", anesthesiologist: "Beto PM" }),
+      ]),
+    )
+    expect(prismaMock.shift.create).toHaveBeenCalledTimes(2)
+  })
+
   it("replaces an automatically generated NOCHE shift with a covered night", async () => {
     prismaMock.shift.findMany.mockResolvedValue([automaticNight])
     prismaMock.shift.update.mockImplementation(async ({ where, data }: { where: { id: string }; data: object }) => ({
@@ -261,5 +364,58 @@ describe("Soma calendar route integration", () => {
       ]),
       skipDuplicates: true,
     })
+  })
+})
+
+describe("Replacement people route", () => {
+  it("lists active people by default and supports including inactive contacts", async () => {
+    prismaMock.replacementPerson.findMany.mockResolvedValue([])
+
+    await getPeople(new Request("http://localhost/api/replacement-people?includeInactive=true"))
+
+    expect(prismaMock.replacementPerson.findMany).toHaveBeenCalledWith({
+      where: {},
+      orderBy: [{ active: "desc" }, { name: "asc" }],
+    })
+  })
+
+  it("creates a trimmed catalog entry and normalizes blank contact fields", async () => {
+    prismaMock.replacementPerson.findFirst.mockResolvedValue(null)
+    prismaMock.replacementPerson.create.mockResolvedValue({ id: "person-1", name: "Ana" })
+    const response = await createPerson(
+      new Request("http://localhost/api/replacement-people", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: " Ana ", phone: " ", email: "", notes: " " }),
+      }),
+    )
+
+    expect(response.status).toBe(201)
+    expect(prismaMock.replacementPerson.create).toHaveBeenCalledWith({
+      data: { name: "Ana", phone: null, email: null, notes: null },
+    })
+  })
+
+  it("deactivates a contact with coverage history instead of deleting it", async () => {
+    prismaMock.replacementPerson.findUnique.mockResolvedValue({
+      id: "person-1",
+      _count: { coverages: 2 },
+    })
+    prismaMock.replacementPerson.update.mockResolvedValue({ id: "person-1", active: false })
+    const response = await deletePerson(
+      new Request("http://localhost/api/replacement-people", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: "person-1" }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ deleted: false, deactivated: true })
+    expect(prismaMock.replacementPerson.update).toHaveBeenCalledWith({
+      where: { id: "person-1" },
+      data: { active: false },
+    })
+    expect(prismaMock.replacementPerson.delete).not.toHaveBeenCalled()
   })
 })
