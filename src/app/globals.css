@@ -715,7 +715,11 @@ a {
 }
 
 .calendar-day.outside-month {
-  background: #fafbf9;
+  background: #eef1ed;
+}
+
+.calendar-day.outside-month:hover {
+  background: #e4e9e3;
 }
 
 .day-number {
@@ -724,19 +728,46 @@ a {
   height: 22px;
   flex: 0 0 auto;
   place-items: center;
+  padding: 0;
+  border: 0;
   border-radius: 50%;
+  background: transparent;
   color: #78817b;
+  cursor: pointer;
   font-size: 10px;
 }
 
+.day-number.holiday {
+  background: #fff0ed;
+  color: #b84138;
+  font-weight: 750;
+}
+
 .outside-month .day-number {
-  color: #b8beb8;
+  color: #919b92;
 }
 
 .calendar-day.is-today .day-number {
   background: var(--forest);
   color: white;
   font-weight: 700;
+}
+
+.calendar-day.is-today .day-number.holiday {
+  border: 1px solid #b84138;
+  background: #b84138;
+  color: #fff;
+}
+
+.holiday-label {
+  overflow: hidden;
+  margin: 1px 0 2px;
+  color: #b84138;
+  font-size: 7px;
+  font-weight: 700;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .day-entries {
@@ -754,9 +785,12 @@ a {
   gap: 3px;
   overflow: hidden;
   padding: 1px 4px;
+  border: 0;
   border-radius: 3px;
   font-size: 8px;
   line-height: 1.25;
+  text-align: left;
+  cursor: pointer;
 }
 
 .day-entry-label {
@@ -771,10 +805,41 @@ a {
   opacity: 0.78;
 }
 
+.day-entry.manual-override {
+  outline: 1px dashed currentColor;
+  outline-offset: -2px;
+}
+
 .day-entry.shift,
 .legend-swatch.shift,
 .upcoming-mark.shift {
   background: #233f76;
+  color: white;
+}
+
+.day-entry.other-shift,
+.legend-swatch.other-shift,
+.upcoming-mark.other-shift {
+  background: #176b59;
+  color: white;
+}
+
+.day-entry.borrowed-shift,
+.legend-swatch.borrowed-shift,
+.upcoming-mark.borrowed-shift {
+  background: #a3462a;
+  color: white;
+}
+
+.day-entry.external,
+.upcoming-mark.external {
+  background: #e2f0fa;
+  color: #315f7c;
+}
+
+.day-entry.external-night,
+.upcoming-mark.external-night {
+  background: #34415f;
   color: white;
 }
 
@@ -816,8 +881,12 @@ a {
   width: 18px;
   height: 18px;
   place-items: center;
+  padding: 0;
+  border: 0;
   border-radius: 4px;
+  background: transparent;
   color: #98a29b;
+  cursor: pointer;
   opacity: 0;
 }
 
@@ -829,10 +898,11 @@ a {
 
 .calendar-footnote {
   display: flex;
+  flex-wrap: wrap;
   min-height: 37px;
   align-items: center;
-  gap: 15px;
-  padding: 0 14px;
+  gap: 8px 15px;
+  padding: 8px 14px;
   border-top: 1px solid #edf0eb;
   color: #79837d;
   font-size: 8px;
@@ -888,6 +958,21 @@ a {
 
 .agenda-item:hover {
   background: #fafcf9;
+}
+
+.agenda-holiday {
+  background: #fff8f6;
+  cursor: default;
+}
+
+.agenda-holiday .agenda-date,
+.agenda-holiday .agenda-item-title,
+.agenda-holiday .agenda-item-detail {
+  color: #b84138;
+}
+
+.agenda-holiday .entry-dot {
+  background: #b84138;
 }
 
 .agenda-date {
@@ -1296,6 +1381,72 @@ a {
   font-size: 8px;
 }
 
+.annual-plan-panel {
+  margin-top: 15px;
+  padding: 17px;
+  border: 1px solid #e3e8e1;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.annual-plan-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 15px;
+}
+
+.annual-plan-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 6px;
+  background: #f2f6ed;
+  color: #57814a;
+}
+
+.annual-plan-heading .eyebrow {
+  margin-bottom: 3px;
+}
+
+.annual-plan-heading h2 {
+  margin: 0;
+  color: #24332f;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.annual-plan-form {
+  display: grid;
+  gap: 12px;
+}
+
+.annual-plan-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 11px;
+}
+
+.annual-plan-help {
+  margin: 0;
+  color: #7d8881;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.annual-plan-message {
+  margin: 0;
+  color: #477449;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.annual-plan-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .dashboard-footer b {
   padding: 0 4px;
   color: #a9b1ab;
@@ -1430,6 +1581,64 @@ a {
   color: #657169;
   cursor: pointer;
   font-size: 10px;
+}
+
+.delete-button {
+  display: inline-flex;
+  min-height: 35px;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+  padding: 0 10px;
+  border: 1px solid #f0d0ca;
+  border-radius: 5px;
+  background: #fff8f6;
+  color: #a84439;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.restore-button {
+  border-color: #c6ddd2;
+  background: #f2faf6;
+  color: #176b59;
+}
+
+.delete-confirmation {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid #f0c9bc;
+  border-radius: 5px;
+  background: #fff5f1;
+  color: #9c4e3b;
+  font-size: 10px;
+}
+
+.restore-confirmation {
+  border-color: #c6ddd2;
+  background: #f2faf6;
+  color: #176b59;
+}
+
+.restore-confirmation .confirm-delete-button {
+  border-color: #c6ddd2;
+  color: #176b59;
+}
+
+.confirm-delete-button,
+.cancel-delete-button {
+  min-height: 30px;
+  padding: 0 9px;
+  border: 1px solid #e7cbc4;
+  border-radius: 4px;
+  background: #fff;
+  color: #9c4e3b;
+  cursor: pointer;
+  font-size: 9px;
+  font-weight: 650;
 }
 
 .submit-button {
@@ -1757,6 +1966,11 @@ a {
     font-size: 9px;
   }
 
+  .holiday-label {
+    margin: 0 0 1px;
+    font-size: 6px;
+  }
+
   .day-entries {
     gap: 2px;
     margin-top: 2px;
@@ -1816,6 +2030,19 @@ a {
     gap: 5px;
     padding: 14px 2px 0;
     font-size: 7px;
+  }
+
+  .annual-plan-panel {
+    padding: 13px;
+  }
+
+  .annual-plan-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .annual-plan-grid .form-field {
+    font-size: 9px;
   }
 
   .mobile-bottom-nav {

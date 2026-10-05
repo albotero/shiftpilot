@@ -1,3 +1,5 @@
+Las vacaciones se agregan como bloques manuales de una o más semanas completas de siete días. El día inicial puede ser cualquier día de la semana; la fecha final se calcula y puede reprogramarse o cancelarse desde el calendario. El cierre anual de Soma no crea vacaciones automáticamente.
+
 # ShiftPilot
 
 ShiftPilot es una aplicación personal para organizar turnos, eventos y finanzas. Esta guía está escrita para quien quiera crear y mantener su propia bifurcación (fork), usar sus propios datos y desplegar una instancia independiente.
@@ -96,6 +98,8 @@ Otros comandos:
 - `src/**/*.test.ts`: pruebas de reglas financieras, disponibilidad y deuda.
 
 Las reglas financieras deben permanecer en `src/lib/` y probarse sin depender de componentes React. Los importes se guardan como enteros; evita `float` para dinero.
+
+La rotación de Soma se configura por año desde la aplicación: rango principal, fecha/estado ancla y regla especial de cierre. La secuencia futura no se extrapola automáticamente, ya que su ancla se define al cerrar cada año. Los festivos colombianos se calculan por ley y Pascua; no se mantiene una tabla fija por año.
 
 ## Personalizar el seed
 

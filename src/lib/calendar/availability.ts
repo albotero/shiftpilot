@@ -1,6 +1,6 @@
 import type { CalendarEntry, ShiftPeriod } from "./types"
 
-export type AvailabilityState = "SIN_REGISTRO" | "LIBRE" | "RESERVA" | "OCUPADO" | "EVENTO" | "VACACIONES"
+export type AvailabilityState = "LIBRE" | "RESERVA" | "OCUPADO" | "EVENTO" | "VACACIONES"
 
 export type ShiftWindow = {
   startTime: string
@@ -16,18 +16,28 @@ export type ScheduleConflict = {
   type: "HORARIO" | "VACACIONES"
 }
 
+const occupiedSomaStatuses = new Set(["TURNO", "NOCHE", "TURNO_DE_OTRA_PERSONA", "EXTERNO", "EXTERNO_NOCHE"])
+
 function includesDate(entry: CalendarEntry, date: string) {
-  return entry.date <= date && (entry.endDate ?? entry.date) >= date
+  const endDate = entry.endDate ?? (entry.kind === "VACACIONES" ? "9999-12-31" : entry.date)
+  return entry.date <= date && endDate >= date
 }
 
 export function getDayAvailability(entries: CalendarEntry[], date: string): AvailabilityState {
   const dayEntries = entries.filter((entry) => includesDate(entry, date))
   if (dayEntries.some((entry) => entry.kind === "VACACIONES")) return "VACACIONES"
-  if (dayEntries.some((entry) => entry.kind === "SOMA" && entry.status === "TURNO")) return "OCUPADO"
+  if (dayEntries.some((entry) => entry.kind === "SOMA" && entry.status && occupiedSomaStatuses.has(entry.status)))
+    return "OCUPADO"
   if (dayEntries.some((entry) => entry.kind === "SOMA" && entry.status?.startsWith("R"))) return "RESERVA"
   if (dayEntries.some((entry) => entry.kind === "SEDARTE" || entry.kind === "PERSONAL")) return "EVENTO"
-  if (dayEntries.some((entry) => entry.kind === "SOMA" && entry.status === "LIBRE")) return "LIBRE"
-  return "SIN_REGISTRO"
+  if (
+    dayEntries.some(
+      (entry) => entry.kind === "SOMA" && (entry.status === "LIBRE" || entry.status === "TURNO_OTRA_PERSONA"),
+    )
+  ) {
+    return "LIBRE"
+  }
+  return "LIBRE"
 }
 
 function parseTime(time: string) {
@@ -39,7 +49,7 @@ function getIntervals(entry: CalendarEntry, windows: ShiftWindows) {
   if (entry.kind === "VACACIONES") return [{ start: 0, end: 1440 }]
 
   if (entry.kind === "SOMA") {
-    if (entry.status === "LIBRE" || !entry.period) return []
+    if (entry.status === "LIBRE" || entry.status === "TURNO_OTRA_PERSONA" || !entry.period) return []
     const periods = entry.period === "AM + PM" ? (["AM", "PM"] as const) : [entry.period]
     return periods.flatMap((period) => {
       const window = windows[period]

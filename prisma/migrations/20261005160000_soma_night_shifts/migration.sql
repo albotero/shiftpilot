@@ -1,0 +1,2 @@
+ALTER TYPE "SomaShiftStatus" ADD VALUE 'NOCHE';
+ALTER TYPE "ShiftPeriod" ADD VALUE 'NOCHE';

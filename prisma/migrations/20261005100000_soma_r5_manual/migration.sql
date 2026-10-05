@@ -1,0 +1,1 @@
+ALTER TYPE "SomaShiftStatus" ADD VALUE 'R5';

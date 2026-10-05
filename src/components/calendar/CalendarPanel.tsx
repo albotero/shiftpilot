@@ -1,21 +1,9 @@
-"use client";
+"use client"
 
-import {
-  addDays,
-  addMonths,
-  format,
-  isSameMonth,
-  isToday,
-  subMonths,
-} from "date-fns";
-import {
-  ArrowLeft,
-  ArrowRight,
-  CalendarDays,
-  ChevronDown,
-  Plus,
-} from "lucide-react";
-import { es } from "date-fns/locale";
+import { addDays, addMonths, eachDayOfInterval, format, isSameMonth, isToday, subMonths } from "date-fns"
+import { ArrowLeft, ArrowRight, CalendarDays, ChevronDown, Plus } from "lucide-react"
+import { es } from "date-fns/locale"
+import { getColombianHoliday } from "@/lib/calendar/colombian-holidays"
 import {
   formatLongDate,
   formatMonth,
@@ -24,27 +12,24 @@ import {
   getEntryTone,
   getVisibleDays,
   toDateKey,
-} from "@/lib/calendar/utils";
-import type {
-  CalendarEntry,
-  CalendarEntryKind,
-  CalendarView,
-  EntryFilters,
-} from "@/lib/calendar/types";
+} from "@/lib/calendar/utils"
+import type { CalendarEntry, CalendarEntryKind, CalendarView, EntryFilters } from "@/lib/calendar/types"
 
 type CalendarPanelProps = {
-  entries: CalendarEntry[];
-  activeDate: Date;
-  view: CalendarView;
-  filters: EntryFilters;
-  onViewChange: (view: CalendarView) => void;
-  onDateChange: (date: Date) => void;
-  onAdd: (date: Date) => void;
-  onFiltersChange: (filters: EntryFilters) => void;
-};
+  entries: CalendarEntry[]
+  activeDate: Date
+  view: CalendarView
+  filters: EntryFilters
+  onViewChange: (view: CalendarView) => void
+  onDateChange: (date: Date) => void
+  onAdd: (date: Date) => void
+  onEdit: (entry: CalendarEntry) => void
+  onFiltersChange: (filters: EntryFilters) => void
+}
 
-const weekdays = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
-const filterOrder: CalendarEntryKind[] = ["SOMA", "SEDARTE", "PERSONAL", "VACACIONES"];
+const weekdays = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+const filterOrder: CalendarEntryKind[] = ["SOMA", "SEDARTE", "PERSONAL", "VACACIONES"]
+type AgendaItem = { date: string; entry: CalendarEntry } | { date: string; holiday: string }
 
 export function CalendarPanel({
   entries,
@@ -54,41 +39,64 @@ export function CalendarPanel({
   onViewChange,
   onDateChange,
   onAdd,
+  onEdit,
   onFiltersChange,
 }: CalendarPanelProps) {
-  const visibleDays = getVisibleDays(activeDate, view);
-  const visibleEntries = entries.filter((entry) => filters[entry.kind]);
+  const visibleDays = getVisibleDays(activeDate, view)
+  const visibleEntries = entries.filter((entry) => filters[entry.kind])
+  const agendaEnd = addDays(activeDate, 30)
+  const agendaStartKey = toDateKey(activeDate)
+  const agendaEndKey = toDateKey(agendaEnd)
+  const agendaItems: AgendaItem[] = [
+    ...visibleEntries
+      .filter((entry) => entry.date >= agendaStartKey && entry.date <= agendaEndKey)
+      .map((entry) => ({ date: entry.date, entry })),
+    ...eachDayOfInterval({ start: activeDate, end: agendaEnd }).flatMap((day) => {
+      const date = toDateKey(day)
+      const holiday = getColombianHoliday(date)
+      return holiday ? [{ date, holiday: holiday.name }] : []
+    }),
+  ].sort((left, right) => left.date.localeCompare(right.date))
 
   function move(direction: -1 | 1) {
-    const nextDate = view === "week"
-      ? addDays(activeDate, direction * 7)
-      : view === "agenda"
-        ? addDays(activeDate, direction * 30)
-        : direction === 1
-          ? addMonths(activeDate, 1)
-          : subMonths(activeDate, 1);
-    onDateChange(nextDate);
+    const nextDate =
+      view === "week"
+        ? addDays(activeDate, direction * 7)
+        : view === "agenda"
+          ? addDays(activeDate, direction * 30)
+          : direction === 1
+            ? addMonths(activeDate, 1)
+            : subMonths(activeDate, 1)
+    onDateChange(nextDate)
   }
 
   function toggleFilter(kind: CalendarEntryKind) {
-    onFiltersChange({ ...filters, [kind]: !filters[kind] });
+    onFiltersChange({ ...filters, [kind]: !filters[kind] })
   }
 
   return (
     <section className="calendar-panel" id="calendar" aria-label="Calendario">
       <div className="calendar-toolbar">
         <div className="calendar-title-group">
-          <div className="calendar-title-icon"><CalendarDays size={18} /></div>
+          <div className="calendar-title-icon">
+            <CalendarDays size={18} />
+          </div>
           <div>
             <p className="eyebrow">Tu calendario</p>
             <h2>{formatMonth(activeDate)}</h2>
           </div>
         </div>
         <div className="calendar-actions">
-          <button className="today-button" onClick={() => onDateChange(new Date())}>Hoy</button>
+          <button className="today-button" onClick={() => onDateChange(new Date())}>
+            Hoy
+          </button>
           <div className="month-arrows" aria-label="Navegar calendario">
-            <button aria-label="Periodo anterior" onClick={() => move(-1)}><ArrowLeft size={16} /></button>
-            <button aria-label="Periodo siguiente" onClick={() => move(1)}><ArrowRight size={16} /></button>
+            <button aria-label="Periodo anterior" onClick={() => move(-1)}>
+              <ArrowLeft size={16} />
+            </button>
+            <button aria-label="Periodo siguiente" onClick={() => move(1)}>
+              <ArrowRight size={16} />
+            </button>
           </div>
           <button className="add-entry-button" onClick={() => onAdd(activeDate)}>
             <Plus size={16} /> <span>Agregar</span>
@@ -127,21 +135,40 @@ export function CalendarPanel({
 
       {view === "agenda" ? (
         <div className="agenda-view">
-          {visibleEntries
-            .filter((entry) => entry.date >= toDateKey(activeDate) && entry.date <= toDateKey(addDays(activeDate, 30)))
-            .sort((left, right) => left.date.localeCompare(right.date))
-            .map((entry) => (
-              <button className="agenda-item" key={entry.id} onClick={() => onAdd(new Date(`${entry.date}T12:00:00`))}>
-                <span className="agenda-date">{format(new Date(`${entry.date}T12:00:00`), "d MMM", { locale: es })}</span>
-                <span className={`entry-dot ${getEntryTone(entry)}`} />
-                <span className="agenda-item-title">{getEntryLabel(entry)}</span>
-                <span className="agenda-item-detail">
-                  {entry.startTime ? `${entry.startTime}${entry.durationHours ? ` · ${entry.durationHours} h` : ""}` : entry.kind === "SOMA" ? entry.period : "Día completo"}
+          {agendaItems.map((item) => {
+            if ("entry" in item) {
+              const entry = item.entry
+              return (
+                <button className="agenda-item" key={entry.id} onClick={() => onEdit(entry)}>
+                  <span className="agenda-date">
+                    {format(new Date(`${entry.date}T12:00:00`), "d MMM", { locale: es })}
+                  </span>
+                  <span className={`entry-dot ${getEntryTone(entry)}`} />
+                  <span className="agenda-item-title">{getEntryLabel(entry)}</span>
+                  <span className="agenda-item-detail">
+                    {entry.startTime
+                      ? `${entry.startTime}${entry.durationHours ? ` · ${entry.durationHours} h` : ""}`
+                      : entry.kind === "SOMA"
+                        ? entry.period
+                        : "Día completo"}
+                  </span>
+                  <ChevronDown size={15} className="agenda-chevron" />
+                </button>
+              )
+            }
+
+            return (
+              <div className="agenda-item agenda-holiday" key={`holiday-${item.date}`}>
+                <span className="agenda-date">
+                  {format(new Date(`${item.date}T12:00:00`), "d MMM", { locale: es })}
                 </span>
-                <ChevronDown size={15} className="agenda-chevron" />
-              </button>
-            ))}
-          {visibleEntries.filter((entry) => entry.date >= toDateKey(activeDate) && entry.date <= toDateKey(addDays(activeDate, 30))).length === 0 && (
+                <span className="entry-dot" />
+                <span className="agenda-item-title">{item.holiday}</span>
+                <span className="agenda-item-detail">Festivo nacional</span>
+              </div>
+            )
+          })}
+          {agendaItems.length === 0 && (
             <div className="empty-agenda">
               <CalendarDays size={22} />
               <p>No hay actividades en este periodo.</p>
@@ -152,42 +179,97 @@ export function CalendarPanel({
       ) : (
         <div className={`calendar-grid-wrap ${view === "week" ? "week-grid-wrap" : ""}`}>
           <div className="weekday-row">
-            {weekdays.map((weekday) => <span key={weekday}>{weekday}</span>)}
+            {weekdays.map((weekday) => (
+              <span key={weekday}>{weekday}</span>
+            ))}
           </div>
           <div className={`calendar-grid ${view === "week" ? "week-grid" : ""}`}>
             {visibleDays.map((day) => {
-              const dayEntries = getEntriesForDate(visibleEntries, day);
-              const inMonth = isSameMonth(day, activeDate);
+              const dayEntries = getEntriesForDate(visibleEntries, day, filters.SOMA)
+              const inMonth = isSameMonth(day, activeDate)
+              const holiday = getColombianHoliday(toDateKey(day))
               return (
-                <button
+                <div
                   key={toDateKey(day)}
-                  className={`calendar-day ${inMonth ? "in-month" : "outside-month"} ${isToday(day) ? "is-today" : ""}`}
+                  className={`calendar-day ${inMonth ? "in-month" : "outside-month"} ${isToday(day) ? "is-today" : ""} ${holiday ? "is-holiday" : ""}`}
                   onClick={() => onAdd(day)}
-                  aria-label={`${formatLongDate(day)}. Agregar actividad`}
+                  role="group"
+                  aria-label={`${formatLongDate(day)}.${holiday ? ` Festivo: ${holiday.name}.` : ""}`}
                 >
-                  <span className="day-number">{format(day, "d")}</span>
+                  <button
+                    type="button"
+                    className={`day-number ${holiday ? "holiday" : ""}`}
+                    aria-label={`Agregar actividad el ${formatLongDate(day)}`}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onAdd(day)
+                    }}
+                  >
+                    {format(day, "d")}
+                  </button>
+                  {holiday && (
+                    <span className="holiday-label" title={holiday.name}>
+                      {holiday.name}
+                    </span>
+                  )}
                   <span className="day-entries">
                     {dayEntries.slice(0, view === "week" ? 4 : 3).map((entry) => (
-                      <span key={entry.id} className={`day-entry ${getEntryTone(entry)}`} title={getEntryLabel(entry)}>
+                      <button
+                        type="button"
+                        key={entry.id}
+                        className={`day-entry ${getEntryTone(entry)} ${entry.manualOverride ? "manual-override" : ""}`}
+                        title={`${getEntryLabel(entry)}${entry.manualOverride ? " · Ajuste manual" : ""}`}
+                        aria-label={
+                          entry.isFallback ? `Agregar turno ${entry.period}` : `Editar ${getEntryLabel(entry)}`
+                        }
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          if (entry.isFallback) onAdd(day)
+                          else onEdit(entry)
+                        }}
+                      >
                         <span className="day-entry-label">{getEntryLabel(entry)}</span>
                         {entry.startTime && <span className="day-entry-time">{entry.startTime}</span>}
-                      </span>
+                      </button>
                     ))}
                     {dayEntries.length > (view === "week" ? 4 : 3) && (
                       <span className="more-entries">+{dayEntries.length - (view === "week" ? 4 : 3)} más</span>
                     )}
                   </span>
-                  <span className="day-add"><Plus size={13} /></span>
-                </button>
-              );
+                  <button
+                    type="button"
+                    className="day-add"
+                    aria-label={`Agregar actividad el ${formatLongDate(day)}`}
+                    onClick={(event) => {
+                      event.stopPropagation()
+                      onAdd(day)
+                    }}
+                  >
+                    <Plus size={13} />
+                  </button>
+                </div>
+              )
             })}
           </div>
         </div>
       )}
       <div className="calendar-footnote">
-        <span><i className="legend-swatch shift" />Turno presencial bloquea disponibilidad</span>
-        <span><i className="legend-swatch reservation" />R1–R4 son reservas Soma</span>
+        <span>
+          <i className="legend-swatch shift" />
+          Turno
+        </span>
+        <span>
+          <i className="legend-swatch reservation" />R son reservas de Soma
+        </span>
+        <span>
+          <i className="legend-swatch other-shift" />
+          Cubierto por otra persona
+        </span>
+        <span>
+          <i className="legend-swatch borrowed-shift" />
+          Turno de otra persona
+        </span>
       </div>
     </section>
-  );
+  )
 }

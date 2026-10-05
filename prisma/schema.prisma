@@ -13,12 +13,19 @@ enum SomaShiftStatus {
   R3
   R2
   R1
+  R5
   TURNO
+  NOCHE
+  TURNO_OTRA_PERSONA
+  TURNO_DE_OTRA_PERSONA
+  EXTERNO
+  EXTERNO_NOCHE
 }
 
 enum ShiftPeriod {
   AM
   PM
+  NOCHE
 }
 
 enum EventCategory {
@@ -59,6 +66,9 @@ model Shift {
   period         ShiftPeriod
   status         SomaShiftStatus
   durationHours  Int              @default(6)
+  manualOverride Boolean          @default(false)
+  anesthesiologist String?
+  notes          String?
   coverages      ShiftCoverage[]
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
@@ -92,11 +102,12 @@ model ReplacementPerson {
 }
 
 model Vacation {
-  id        String   @id @default(cuid())
-  startDate DateTime @db.Date
-  endDate   DateTime @db.Date
-  notes     String?
-  createdAt DateTime @default(now())
+  id             String   @id @default(cuid())
+  startDate      DateTime @db.Date
+  endDate        DateTime? @db.Date
+  notes          String?
+  annualPlanYear Int?     @unique
+  createdAt      DateTime @default(now())
 
   @@index([startDate, endDate])
 }

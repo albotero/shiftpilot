@@ -22,16 +22,25 @@ import {
 import { CalendarPanel } from "@/components/calendar/CalendarPanel"
 import { DebtSummaryCard } from "@/components/debt/DebtSummaryCard"
 import { QuickAddDialog } from "@/components/calendar/QuickAddDialog"
+import { SomaAnnualPlanForm } from "@/components/calendar/SomaAnnualPlanForm"
 import { findScheduleConflicts, getDayAvailability } from "@/lib/calendar/availability"
-import { formatLongDate, getEntryLabel, getEntryTone, getMonthShiftHours } from "@/lib/calendar/utils"
+import {
+  formatLongDate,
+  getEntryLabel,
+  getEntryTone,
+  getMonthShiftHours,
+  getMonthSomaShiftCount,
+} from "@/lib/calendar/utils"
 import {
   addCalendarEntry,
+  deleteCalendarEntry,
   getCalendarConnection,
   getCalendarEntries,
   getServerCalendarConnection,
   getServerCalendarSnapshot,
   subscribeToCalendar,
   subscribeToStorageMode,
+  updateCalendarEntry,
 } from "@/lib/calendar/storage"
 import type { CalendarEntry, CalendarView, EntryFilters } from "@/lib/calendar/types"
 
@@ -44,20 +53,20 @@ export function ShiftPilotDashboard() {
   const [view, setView] = useState<CalendarView>("month")
   const [filters, setFilters] = useState(initialFilters)
   const [dialogDate, setDialogDate] = useState<Date | null>(null)
+  const [editingEntry, setEditingEntry] = useState<CalendarEntry | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const monthEntries = entries.filter((entry) => isSameMonth(new Date(`${entry.date}T12:00:00`), activeDate))
-  const shiftCount = monthEntries.filter((entry) => entry.kind === "SOMA" && entry.status === "TURNO").length
+  const shiftCount = getMonthSomaShiftCount(monthEntries, activeDate)
   const eventCount = monthEntries.filter((entry) => entry.kind === "SEDARTE" || entry.kind === "PERSONAL").length
   const shiftHours = getMonthShiftHours(entries, activeDate)
   const todayLabel = formatLongDate(new Date())
   const todayAvailability = getDayAvailability(entries, format(new Date(), "yyyy-MM-dd"))
   const scheduleConflicts = findScheduleConflicts(entries)
   const availabilityLabels = {
-    SIN_REGISTRO: "Sin registro de turnos",
     LIBRE: "Libre",
     RESERVA: "Reserva Soma",
-    OCUPADO: "Turno presencial",
+    OCUPADO: "Turno",
     EVENTO: "Evento en agenda",
     VACACIONES: "Vacaciones",
   } as const
@@ -66,9 +75,27 @@ export function ShiftPilotDashboard() {
     .sort((left, right) => left.date.localeCompare(right.date))
     .slice(0, 4)
 
-  function createEntry(entry: CalendarEntry) {
-    addCalendarEntry(entry)
+  function startNewEntry(date: Date) {
+    setEditingEntry(null)
+    setDialogDate(date)
+  }
+
+  function startEditingEntry(entry: CalendarEntry) {
+    setEditingEntry(entry)
+    setDialogDate(new Date(`${entry.date}T12:00:00`))
+  }
+
+  async function saveEntry(entry: CalendarEntry) {
+    if (editingEntry) await updateCalendarEntry(entry)
+    else await addCalendarEntry(entry)
     setDialogDate(null)
+    setEditingEntry(null)
+  }
+
+  async function removeEntry(entry: CalendarEntry) {
+    await deleteCalendarEntry(entry)
+    setDialogDate(null)
+    setEditingEntry(null)
   }
 
   return (
@@ -168,7 +195,7 @@ export function ShiftPilotDashboard() {
           <section className="stats-grid" aria-label="Resumen del mes">
             <article className="stat-card stat-shifts">
               <div className="stat-heading">
-                <span>Turnos presenciales</span>
+                <span>Turnos</span>
                 <span className="stat-icon orange">
                   <Clock3 size={17} />
                 </span>
@@ -246,7 +273,8 @@ export function ShiftPilotDashboard() {
               filters={filters}
               onViewChange={setView}
               onDateChange={setActiveDate}
-              onAdd={setDialogDate}
+              onAdd={startNewEntry}
+              onEdit={startEditingEntry}
               onFiltersChange={(nextFilters: EntryFilters) => setFilters(nextFilters)}
             />
 
@@ -338,7 +366,9 @@ export function ShiftPilotDashboard() {
             </aside>
           </div>
 
-          <footer className="dashboard-footer" id="settings">
+          <SomaAnnualPlanForm />
+
+          <footer className="dashboard-footer">
             <span>
               ShiftPilot <b>·</b> Valores expresados en miles de COP
             </span>
@@ -367,7 +397,16 @@ export function ShiftPilotDashboard() {
       </nav>
 
       {dialogDate && (
-        <QuickAddDialog initialDate={dialogDate} onClose={() => setDialogDate(null)} onCreate={createEntry} />
+        <QuickAddDialog
+          initialDate={dialogDate}
+          initialEntry={editingEntry}
+          onClose={() => {
+            setDialogDate(null)
+            setEditingEntry(null)
+          }}
+          onSave={saveEntry}
+          onDelete={removeEntry}
+        />
       )}
     </div>
   )
