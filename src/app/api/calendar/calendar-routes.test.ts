@@ -531,6 +531,145 @@ describe("Vacation calendar routes", () => {
   })
 })
 
+describe("Sedarte calendar routes", () => {
+  const sedarteWork = { id: "sedarte-work", name: "Sedarte" }
+  const sedarteEvent = {
+    id: "sedarte-event",
+    workId: sedarteWork.id,
+    category: "SEDARTE",
+    title: "Procedimiento",
+    date: new Date("2026-10-07T00:00:00.000Z"),
+    startTime: "09:30",
+    durationMinutes: 75,
+    location: "Quirófano 2",
+    notes: "Confirmar equipo",
+  }
+
+  it("creates a timed Sedarte event with title, location, notes, and rounded minutes", async () => {
+    prismaMock.work.findUnique.mockResolvedValue(sedarteWork)
+    prismaMock.event.create.mockResolvedValue(sedarteEvent)
+
+    const response = await POST(
+      jsonRequest({
+        id: sedarteEvent.id,
+        date: "2026-10-07",
+        kind: "SEDARTE",
+        title: "Procedimiento",
+        startTime: "09:30",
+        durationHours: 1.25,
+        location: "Quirófano 2",
+        notes: "Confirmar equipo",
+      }),
+    )
+
+    expect(response.status).toBe(201)
+    expect(await response.json()).toMatchObject([
+      {
+        id: sedarteEvent.id,
+        date: "2026-10-07",
+        kind: "SEDARTE",
+        durationHours: 1.25,
+        location: "Quirófano 2",
+        notes: "Confirmar equipo",
+      },
+    ])
+    expect(prismaMock.event.create).toHaveBeenCalledWith({
+      data: {
+        workId: sedarteWork.id,
+        category: "SEDARTE",
+        title: "Procedimiento",
+        date: new Date("2026-10-07T00:00:00.000Z"),
+        startTime: "09:30",
+        durationMinutes: 75,
+        location: "Quirófano 2",
+        notes: "Confirmar equipo",
+      },
+    })
+  })
+
+  it("returns Sedarte duration, location, and notes from calendar GET", async () => {
+    prismaMock.shift.findMany.mockResolvedValue([])
+    prismaMock.event.findMany.mockResolvedValue([sedarteEvent])
+    prismaMock.vacation.findMany.mockResolvedValue([])
+
+    const response = await getCalendar()
+
+    expect(await response.json()).toEqual([
+      {
+        id: sedarteEvent.id,
+        date: "2026-10-07",
+        kind: "SEDARTE",
+        title: "Procedimiento",
+        startTime: "09:30",
+        durationHours: 1.25,
+        location: "Quirófano 2",
+        notes: "Confirmar equipo",
+      },
+    ])
+  })
+
+  it("updates Sedarte event details and normalizes duration to minutes", async () => {
+    prismaMock.event.findUnique.mockResolvedValue(sedarteEvent)
+    prismaMock.event.update.mockResolvedValue({ ...sedarteEvent, durationMinutes: 90, location: "Sala 3" })
+
+    const response = await PATCH(
+      new Request("http://localhost/api/calendar", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: sedarteEvent.id,
+          date: "2026-10-07",
+          kind: "SEDARTE",
+          title: "Procedimiento",
+          startTime: "09:30",
+          durationHours: 1.5,
+          location: "Sala 3",
+          notes: "Confirmar equipo",
+        }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject([{ durationHours: 1.5, location: "Sala 3" }])
+    expect(prismaMock.event.update).toHaveBeenCalledWith({
+      where: { id: sedarteEvent.id },
+      data: {
+        title: "Procedimiento",
+        date: new Date("2026-10-07T00:00:00.000Z"),
+        startTime: "09:30",
+        durationMinutes: 90,
+        location: "Sala 3",
+        notes: "Confirmar equipo",
+      },
+    })
+  })
+
+  it("deletes a Sedarte event and requires time and duration", async () => {
+    prismaMock.event.findUnique.mockResolvedValue(sedarteEvent)
+    const deleted = await DELETE(
+      new Request("http://localhost/api/calendar", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: sedarteEvent.id, kind: "SEDARTE" }),
+      }),
+    )
+
+    expect(deleted.status).toBe(200)
+    expect(prismaMock.event.delete).toHaveBeenCalledWith({ where: { id: sedarteEvent.id } })
+
+    const invalid = await POST(
+      jsonRequest({
+        id: "sedarte-untimed",
+        date: "2026-10-07",
+        kind: "SEDARTE",
+        title: "Sin horario",
+      }),
+    )
+    expect(invalid.status).toBe(400)
+    expect(prismaMock.event.create).not.toHaveBeenCalled()
+  })
+})
+
 describe("Replacement people route", () => {
   it("lists active people by default and supports including inactive contacts", async () => {
     prismaMock.replacementPerson.findMany.mockResolvedValue([])

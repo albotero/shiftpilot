@@ -15,6 +15,33 @@ describe("calendar event and vacation mutations", () => {
     ).toBe(true)
   })
 
+  it("does not model Sedarte events with Soma periods", () => {
+    const sedarte = {
+      id: "sedarte-1",
+      date: "2026-10-07",
+      kind: "SEDARTE",
+      title: "Procedimiento",
+      startTime: "09:30",
+      durationHours: 2,
+    }
+
+    expect(createCalendarEntrySchema.safeParse(sedarte).success).toBe(true)
+    expect(createCalendarEntrySchema.safeParse({ ...sedarte, period: "AM" }).success).toBe(false)
+  })
+
+  it("requires a non-empty title for Sedarte events", () => {
+    const sedarte = {
+      id: "sedarte-1",
+      date: "2026-10-07",
+      kind: "SEDARTE",
+      title: " ",
+      startTime: "09:30",
+      durationHours: 2,
+    }
+
+    expect(createCalendarEntrySchema.safeParse(sedarte).success).toBe(false)
+  })
+
   it("accepts personal events with no time or with a complete time/duration pair", () => {
     const base = { id: "personal-1", date: "2026-10-07", kind: "PERSONAL", title: "Cita médica" }
     expect(createCalendarEntrySchema.safeParse(base).success).toBe(true)

@@ -145,6 +145,29 @@ describe("calendar availability", () => {
     expect(conflicts).toMatchObject([{ date: "2026-10-05", type: "HORARIO" }])
   })
 
+  it("detects overlapping timed Sedarte and personal events", () => {
+    const sedarte: CalendarEntry = {
+      id: "sedarte-event",
+      date: "2026-10-05",
+      kind: "SEDARTE",
+      title: "Procedimiento",
+      startTime: "09:30",
+      durationHours: 2,
+    }
+    const personal: CalendarEntry = {
+      id: "personal-event",
+      date: "2026-10-05",
+      kind: "PERSONAL",
+      title: "Cita",
+      startTime: "11:00",
+      durationHours: 1,
+    }
+
+    expect(findScheduleConflicts([sedarte, personal])).toMatchObject([
+      { date: "2026-10-05", firstEntryId: sedarte.id, secondEntryId: personal.id, type: "HORARIO" },
+    ])
+  })
+
   it("reports a vacation overlap without adding financial penalties", () => {
     const vacation: CalendarEntry = {
       id: "vacation",

@@ -37,6 +37,9 @@ export const createCalendarEntrySchema = z
     notes: z.string().trim().max(500).optional(),
   })
   .superRefine((entry, context) => {
+    if (entry.kind !== "SOMA" && entry.period !== undefined) {
+      context.addIssue({ code: "custom", message: "Las jornadas AM/PM sólo aplican a Soma", path: ["period"] })
+    }
     if (entry.kind === "SOMA" && (!entry.status || !entry.period)) {
       context.addIssue({ code: "custom", message: "Soma requires a status and period", path: ["status"] })
     }
@@ -46,6 +49,9 @@ export const createCalendarEntrySchema = z
         message: "Timed events require a start time and duration",
         path: ["startTime"],
       })
+    }
+    if (entry.kind === "SEDARTE" && !entry.title) {
+      context.addIssue({ code: "custom", message: "Sedarte events require a title", path: ["title"] })
     }
     if (entry.kind === "PERSONAL" && Boolean(entry.startTime) !== Boolean(entry.durationHours)) {
       context.addIssue({
