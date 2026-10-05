@@ -1,0 +1,30 @@
+services:
+  db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-shiftpilot}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the .env file}
+      POSTGRES_DB: ${POSTGRES_DB:-shiftpilot}
+    volumes:
+      - shiftpilot-postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-shiftpilot} -d ${POSTGRES_DB:-shiftpilot}"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  app:
+    build: .
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-shiftpilot}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the .env file}@db:5432/${POSTGRES_DB:-shiftpilot}?schema=public
+      NODE_ENV: production
+    ports:
+      - "${SHIFTPILOT_BIND_ADDRESS:-127.0.0.1}:3000:3000"
+
+volumes:
+  shiftpilot-postgres:
