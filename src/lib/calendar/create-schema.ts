@@ -22,6 +22,7 @@ export const createCalendarEntrySchema = z
         "EXTERNO_NOCHE",
       ])
       .optional(),
+    restoreAutomatic: z.boolean().optional(),
     anesthesiologist: z.string().trim().max(100).optional(),
     replacementPersonId: z.string().min(1).optional(),
     amReplacementPersonId: z.string().min(1).optional(),
@@ -37,10 +38,24 @@ export const createCalendarEntrySchema = z
     notes: z.string().trim().max(500).optional(),
   })
   .superRefine((entry, context) => {
+    if (entry.restoreAutomatic && entry.kind !== "SOMA") {
+      context.addIssue({
+        code: "custom",
+        message: "Automatic rotation applies only to Soma",
+        path: ["restoreAutomatic"],
+      })
+    }
+    if (entry.restoreAutomatic && entry.status !== undefined) {
+      context.addIssue({
+        code: "custom",
+        message: "Automatic rotation cannot include a manual status",
+        path: ["status"],
+      })
+    }
     if (entry.kind !== "SOMA" && entry.period !== undefined) {
       context.addIssue({ code: "custom", message: "Las jornadas AM/PM sólo aplican a Soma", path: ["period"] })
     }
-    if (entry.kind === "SOMA" && (!entry.status || !entry.period)) {
+    if (entry.kind === "SOMA" && ((!entry.status && !entry.restoreAutomatic) || !entry.period)) {
       context.addIssue({ code: "custom", message: "Soma requires a status and period", path: ["status"] })
     }
     if (entry.kind === "SEDARTE" && (!entry.startTime || !entry.durationHours)) {

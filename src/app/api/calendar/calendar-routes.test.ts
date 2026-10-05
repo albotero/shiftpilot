@@ -82,6 +82,231 @@ beforeEach(() => {
 })
 
 describe("Soma calendar route integration", () => {
+  it("creates an automatic Soma period using the planned status", async () => {
+    prismaMock.appSetting.findMany.mockResolvedValue([{ key: "soma.annualPlan.2026", value: plan2026 }])
+    prismaMock.shift.create.mockImplementation(
+      async ({
+        data,
+      }: {
+        data: {
+          status: string
+          period: string
+          durationHours: number
+          manualOverride: boolean
+          notes: string | null
+        }
+      }) => ({ ...automaticNight, ...data, id: `automatic-${data.period}` }),
+    )
+
+    const response = await POST(
+      jsonRequest({
+        id: "automatic-night",
+        date: "2026-10-01",
+        kind: "SOMA",
+        restoreAutomatic: true,
+        period: "NOCHE",
+        title: "Automático",
+        notes: "Conservar estos detalles",
+      }),
+    )
+    const entries = await response.json()
+
+    expect(response.status).toBe(201)
+    expect(entries).toMatchObject([
+      {
+        status: "NOCHE",
+        period: "NOCHE",
+        manualOverride: false,
+        notes: "Conservar estos detalles",
+      },
+    ])
+    expect(prismaMock.shift.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          status: "NOCHE",
+          period: "NOCHE",
+          durationHours: 12,
+          manualOverride: false,
+        }),
+      }),
+    )
+  })
+
+  it("restores the planned Soma status while preserving edited notes", async () => {
+    const manualAm = {
+      ...automaticNight,
+      id: "manual-auto-am",
+      period: "AM",
+      status: "R5",
+      manualOverride: true,
+      notes: "Nota anterior",
+      coverages: [],
+    }
+    prismaMock.appSetting.findMany.mockResolvedValue([{ key: "soma.annualPlan.2026", value: plan2026 }])
+    prismaMock.shift.findUnique.mockResolvedValue({ ...manualAm, work: somaWork })
+    prismaMock.shift.findMany.mockResolvedValue([manualAm])
+    prismaMock.shift.update.mockImplementation(async ({ where, data }: { where: { id: string }; data: object }) => ({
+      ...manualAm,
+      ...data,
+      id: where.id,
+      coverages: [],
+    }))
+
+    const response = await PATCH(
+      new Request("http://localhost/api/calendar", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: manualAm.id,
+          date: "2026-10-01",
+          kind: "SOMA",
+          restoreAutomatic: true,
+          period: "AM",
+          title: "Automático",
+          notes: "Nota editada",
+        }),
+      }),
+    )
+    const entries = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(entries).toMatchObject([
+      { id: manualAm.id, status: "TURNO", period: "AM", manualOverride: false, notes: "Nota editada" },
+    ])
+    expect(prismaMock.shift.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: manualAm.id },
+        data: expect.objectContaining({
+          status: "TURNO",
+          durationHours: 6,
+          manualOverride: false,
+          anesthesiologist: null,
+          notes: "Nota editada",
+          coverages: { deleteMany: {} },
+        }),
+      }),
+    )
+  })
+
+  it("rejects Automatic when no planned Soma shift exists", async () => {
+    prismaMock.appSetting.findMany.mockResolvedValue([])
+    prismaMock.shift.findUnique.mockResolvedValue({ ...automaticNight, work: somaWork, coverages: [] })
+    prismaMock.shift.findMany.mockResolvedValue([automaticNight])
+
+    const response = await PATCH(
+      new Request("http://localhost/api/calendar", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: automaticNight.id,
+          date: "2026-10-01",
+          kind: "SOMA",
+          restoreAutomatic: true,
+          period: "AM",
+          title: "Automático",
+        }),
+      }),
+    )
+
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ error: "No hay un turno automático programado para esa jornada." })
+    expect(prismaMock.shift.update).not.toHaveBeenCalled()
+  })
+
+  it("creates a shift using the planned status when Automatic is selected", async () => {
+    prismaMock.appSetting.findMany.mockResolvedValue([{ key: "soma.annualPlan.2026", value: plan2026 }])
+    prismaMock.shift.create.mockImplementation(
+      async ({
+        data,
+      }: {
+        data: {
+          status: string
+          period: string
+          durationHours: number
+          manualOverride: boolean
+          notes: string | null
+        }
+      }) => ({ ...automaticNight, ...data, id: "automatic-am" }),
+    )
+
+    const response = await POST(
+      jsonRequest({
+        id: "automatic-am",
+        date: "2026-10-01",
+        kind: "SOMA",
+        restoreAutomatic: true,
+        period: "AM",
+        title: "Automático",
+        notes: "Guardar detalle",
+      }),
+    )
+    const entries = await response.json()
+
+    expect(response.status).toBe(201)
+    expect(entries).toMatchObject([{ status: "TURNO", period: "AM", manualOverride: false, notes: "Guardar detalle" }])
+    expect(prismaMock.shift.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({ status: "TURNO", manualOverride: false, notes: "Guardar detalle" }),
+      }),
+    )
+  })
+
+  it("restores the planned status while saving notes when editing a Soma shift", async () => {
+    const manualAm = {
+      ...automaticNight,
+      id: "manual-auto-am",
+      period: "AM",
+      status: "R5",
+      manualOverride: true,
+      notes: "Nota anterior",
+      coverages: [],
+    }
+    prismaMock.appSetting.findMany.mockResolvedValue([{ key: "soma.annualPlan.2026", value: plan2026 }])
+    prismaMock.shift.findUnique.mockResolvedValue({ ...manualAm, work: somaWork })
+    prismaMock.shift.findMany.mockResolvedValue([manualAm])
+    prismaMock.shift.update.mockImplementation(async ({ where, data }: { where: { id: string }; data: object }) => ({
+      ...manualAm,
+      ...data,
+      id: where.id,
+      coverages: [],
+    }))
+
+    const response = await PATCH(
+      new Request("http://localhost/api/calendar", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: manualAm.id,
+          date: "2026-10-01",
+          kind: "SOMA",
+          restoreAutomatic: true,
+          period: "AM",
+          title: "Automático",
+          notes: "Guardar detalle nuevo",
+        }),
+      }),
+    )
+    const entries = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(entries).toMatchObject([
+      { id: manualAm.id, status: "TURNO", period: "AM", manualOverride: false, notes: "Guardar detalle nuevo" },
+    ])
+    expect(prismaMock.shift.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: manualAm.id },
+        data: expect.objectContaining({
+          status: "TURNO",
+          durationHours: 6,
+          manualOverride: false,
+          anesthesiologist: null,
+          notes: "Guardar detalle nuevo",
+          coverages: { deleteMany: {} },
+        }),
+      }),
+    )
+  })
+
   it("preserves an inactive catalog person on their existing covered shift", async () => {
     const inactivePerson = { id: "person-inactive", name: "Ana histórica", active: false }
     const coveredShift = {

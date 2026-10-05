@@ -16,6 +16,7 @@ type QuickAddDialogProps = {
 }
 
 type ReplacementPerson = { id: string; name: string; active: boolean }
+type SomaFormStatus = SomaStatus | "AUTOMATICO"
 
 const shiftStatuses: SomaStatus[] = [
   "R5",
@@ -43,7 +44,13 @@ function createEntryId() {
 export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onDelete }: QuickAddDialogProps) {
   const isEditing = Boolean(initialEntry)
   const [kind, setKind] = useState<CalendarEntryKind>(initialEntry?.kind ?? "SOMA")
-  const [status, setStatus] = useState<SomaStatus>(initialEntry?.status ?? "R5")
+  const [status, setStatus] = useState<SomaFormStatus>(() =>
+    initialEntry?.kind === "SOMA"
+      ? initialEntry.manualOverride
+        ? (initialEntry.status ?? "R5")
+        : "AUTOMATICO"
+      : "AUTOMATICO",
+  )
   const [period, setPeriod] = useState<ShiftPeriod>(
     initialEntry?.period === "AM + PM" ? "AM" : (initialEntry?.period ?? "AM"),
   )
@@ -77,6 +84,12 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
   )
   const canRestoreRotation = Boolean(initialEntry?.kind === "SOMA" && initialEntry.manualOverride)
   const isCoverageStatus = status === "TURNO_OTRA_PERSONA" || status === "TURNO_DE_OTRA_PERSONA"
+  const showCurrentStatus = Boolean(
+    initialEntry?.kind === "SOMA" &&
+    initialEntry.manualOverride &&
+    initialEntry.status &&
+    !shiftStatuses.includes(initialEntry.status),
+  )
 
   useEffect(() => {
     if (!isCoverageStatus) return
@@ -100,7 +113,12 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (kind === "SOMA" && !shiftStatuses.includes(status)) {
+    if (
+      kind === "SOMA" &&
+      status !== "AUTOMATICO" &&
+      !shiftStatuses.includes(status) &&
+      status !== initialEntry?.status
+    ) {
       setError("Selecciona un tipo de turno manual.")
       return
     }
@@ -134,7 +152,7 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
       kind,
       ...(kind === "SOMA"
         ? {
-            status,
+            ...(status === "AUTOMATICO" ? { restoreAutomatic: true } : { status }),
             period,
             ...(isCoverageStatus && period === "AM + PM"
               ? {
@@ -148,7 +166,9 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
         : {}),
       title:
         kind === "SOMA"
-          ? (statusLabels[status] ?? status)
+          ? status === "AUTOMATICO"
+            ? (initialEntry?.title ?? "Automático")
+            : (statusLabels[status] ?? status)
           : title.trim() || (kind === "SEDARTE" ? "Evento Sedarte" : "Evento personal"),
       ...(kind === "SEDARTE" || (kind === "PERSONAL" && hasTime)
         ? { startTime, durationHours: Number(durationHours) }
@@ -234,13 +254,14 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
                 <label className="form-field">
                   <span>Tipo de turno o reserva</span>
                   <select
-                    value={shiftStatuses.includes(status) ? status : ""}
+                    value={status}
                     onChange={(event) => {
-                      const nextStatus = event.target.value as SomaStatus
+                      const nextStatus = event.target.value as SomaFormStatus
                       setStatus(nextStatus)
                       if (nextStatus === "NOCHE") setPeriod("NOCHE")
                       else if (
                         period === "NOCHE" &&
+                        nextStatus !== "AUTOMATICO" &&
                         nextStatus !== "TURNO_OTRA_PERSONA" &&
                         nextStatus !== "TURNO_DE_OTRA_PERSONA" &&
                         nextStatus !== "EXTERNO_NOCHE"
@@ -250,9 +271,12 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
                       setError("")
                     }}
                   >
-                    <option value="" disabled>
-                      Elige tipo de turno
-                    </option>
+                    <option value="AUTOMATICO">Automático</option>
+                    {showCurrentStatus && initialEntry?.status && (
+                      <option value={initialEntry.status}>
+                        {statusLabels[initialEntry.status] ?? initialEntry.status}
+                      </option>
+                    )}
                     {shiftStatuses.map((item) => (
                       <option key={item} value={item}>
                         {statusLabels[item]}
@@ -266,9 +290,11 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
                     <option value="AM">AM · 6 h</option>
                     <option value="PM">PM · 6 h</option>
                     <option value="AM + PM">AM + PM · 12 h</option>
-                    {(status === "NOCHE" || isCoverageStatus || status === "EXTERNO_NOCHE") && (
-                      <option value="NOCHE">NOCHE · 12 h</option>
-                    )}
+                    {(status === "AUTOMATICO" ||
+                      period === "NOCHE" ||
+                      isCoverageStatus ||
+                      status === "NOCHE" ||
+                      status === "EXTERNO_NOCHE") && <option value="NOCHE">NOCHE · 12 h</option>}
                   </select>
                 </label>
               </div>

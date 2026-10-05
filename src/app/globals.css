@@ -555,6 +555,158 @@ a {
   overflow: hidden;
 }
 
+.shared-calendar-page {
+  min-height: 100vh;
+  padding: 22px;
+  background: var(--canvas);
+}
+
+.shared-calendar-content {
+  width: min(1440px, 100%);
+  margin: 0 auto;
+}
+
+.shared-calendar-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.shared-calendar-home {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 8px;
+  color: #24332f;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.shared-calendar-mark {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border-radius: 6px;
+  background: var(--leaf);
+  color: #20362d;
+}
+
+.shared-month-navigation {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.shared-month-navigation h1 {
+  min-width: 170px;
+  margin: 0;
+  color: #24332f;
+  font-size: 20px;
+  font-weight: 650;
+  text-align: center;
+  text-transform: capitalize;
+}
+
+.shared-month-arrow {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid #e4e8e2;
+  border-radius: 5px;
+  background: #fff;
+  color: #64716a;
+}
+
+.shared-month-arrow:hover {
+  border-color: #b8c8b2;
+  background: #f7faf5;
+  color: #315a3e;
+}
+
+.shared-month-arrow.disabled {
+  opacity: 0.4;
+}
+
+.shared-calendar-back {
+  justify-self: end;
+  color: #66736c;
+  font-size: 10px;
+}
+
+.shared-calendar-panel {
+  overflow: hidden;
+  border: 1px solid #e3e8e1;
+  border-radius: 7px;
+  background: var(--paper);
+}
+
+.shared-calendar-legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 9px 12px;
+  border-bottom: 1px solid #edf0eb;
+  color: #657169;
+  font-size: 9px;
+}
+
+.shared-calendar-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.shared-calendar-legend .legend-swatch {
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+
+.shared-calendar-grid-wrap .calendar-day {
+  cursor: default;
+}
+
+.shared-calendar-page .day-entry {
+  cursor: default;
+}
+
+.shared-calendar-page .day-entry-time {
+  display: inline;
+}
+
+.shared-entry {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.shared-entry-details {
+  min-width: 0;
+  padding: 0 3px 2px;
+  color: #59665f;
+  font-size: 8px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.shared-entry-details summary {
+  color: #64716a;
+  cursor: pointer;
+  font-size: 7px;
+}
+
+.shared-entry-details div {
+  display: grid;
+  gap: 2px;
+  padding-top: 2px;
+}
+
 .calendar-toolbar {
   display: flex;
   min-height: 72px;
@@ -656,6 +808,27 @@ a {
   min-height: 31px;
   padding: 0 10px;
   font-size: 10px;
+}
+
+.calendar-share-button {
+  display: inline-flex;
+  min-height: 31px;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding: 0 9px;
+  border: 1px solid #e4e8e2;
+  border-radius: 5px;
+  background: #fff;
+  color: #64716a;
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.calendar-share-button:hover {
+  border-color: #b8c8b2;
+  background: #f7faf5;
+  color: #315a3e;
 }
 
 .calendar-subtoolbar {
@@ -886,6 +1059,16 @@ a {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.day-entry-note-indicator {
+  display: grid;
+  width: 9px;
+  height: 9px;
+  flex: 0 0 9px;
+  place-items: center;
+  color: currentColor;
+  opacity: .9;
 }
 
 .day-entry-time {
@@ -2442,6 +2625,65 @@ a {
     max-height: 91vh;
     padding: 20px 16px max(18px, env(safe-area-inset-bottom));
     border-radius: 12px 12px 0 0;
+  }
+}
+
+@media (max-width: 720px) {
+  .shared-calendar-page {
+    padding: 12px 8px;
+  }
+
+  .shared-calendar-header {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+
+  .shared-calendar-home {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .shared-calendar-back {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .shared-month-navigation {
+    grid-column: 1 / -1;
+    grid-row: 2;
+    justify-content: center;
+  }
+
+  .shared-month-navigation h1 {
+    min-width: 150px;
+    font-size: 17px;
+  }
+
+  .shared-calendar-legend {
+    gap: 6px 9px;
+    padding: 8px;
+    font-size: 8px;
+  }
+
+  .shared-calendar-panel .calendar-day {
+    min-height: 85px;
+    padding: 5px 3px;
+  }
+
+  .shared-calendar-page .day-entry-time,
+  .shared-entry-details {
+    font-size: 6px;
+  }
+
+  .calendar-share-button {
+    width: 29px;
+    min-width: 29px;
+    min-height: 29px;
+    padding: 0;
+  }
+
+  .calendar-share-button span {
+    display: none;
   }
 }
 

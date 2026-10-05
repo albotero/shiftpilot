@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { createCalendarEntrySchema, deleteCalendarEntrySchema } from "./create-schema"
+import { calendarEntrySchema } from "./schema"
 
 describe("calendar event and vacation mutations", () => {
   it("accepts a rescheduled Sedarte event with its start time and duration", () => {
@@ -40,6 +41,22 @@ describe("calendar event and vacation mutations", () => {
     }
 
     expect(createCalendarEntrySchema.safeParse(sedarte).success).toBe(false)
+  })
+
+  it("accepts Automatic restoration for Soma without a manual status", () => {
+    const automaticSoma = {
+      id: "automatic-soma",
+      date: "2026-10-07",
+      kind: "SOMA",
+      restoreAutomatic: true,
+      period: "AM",
+      title: "Automático",
+    }
+
+    expect(createCalendarEntrySchema.safeParse(automaticSoma).success).toBe(true)
+    expect(calendarEntrySchema.safeParse(automaticSoma).success).toBe(true)
+    expect(createCalendarEntrySchema.safeParse({ ...automaticSoma, kind: "PERSONAL" }).success).toBe(false)
+    expect(createCalendarEntrySchema.safeParse({ ...automaticSoma, status: "R5" }).success).toBe(false)
   })
 
   it("accepts personal events with no time or with a complete time/duration pair", () => {

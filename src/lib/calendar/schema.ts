@@ -22,6 +22,7 @@ export const calendarEntrySchema = z.object({
     ])
     .optional(),
   manualOverride: z.boolean().optional(),
+  restoreAutomatic: z.boolean().optional(),
   annualPlanYear: z.number().int().optional(),
   replacementPersonId: z.string().min(1).optional(),
   anesthesiologist: z.string().max(100).optional(),

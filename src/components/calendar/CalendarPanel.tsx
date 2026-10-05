@@ -2,7 +2,8 @@
 
 import { useState } from "react"
 import { addDays, addMonths, eachDayOfInterval, format, isSameMonth, isToday, subMonths } from "date-fns"
-import { ArrowLeft, ArrowRight, CalendarDays, ChevronDown, Plus } from "lucide-react"
+import Link from "next/link"
+import { ArrowLeft, ArrowRight, CalendarDays, ChevronDown, FileText, Plus, Share2 } from "lucide-react"
 import { es } from "date-fns/locale"
 import { getColombianHoliday } from "@/lib/calendar/colombian-holidays"
 import {
@@ -115,6 +116,17 @@ export function CalendarPanel({
               <ArrowRight size={16} />
             </button>
           </div>
+          <Link
+            className="calendar-share-button"
+            href={`/${format(activeDate, "yyyy")}/${format(activeDate, "MM")}`}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="Compartir calendario"
+            title="Compartir calendario"
+          >
+            <Share2 size={15} />
+            <span>Compartir</span>
+          </Link>
           <button className="add-entry-button" onClick={() => onAdd(activeDate)}>
             <Plus size={16} /> <span>Agregar</span>
           </button>
@@ -247,9 +259,9 @@ export function CalendarPanel({
                         type="button"
                         key={entry.id}
                         className={`day-entry ${getEntryTone(entry)} ${entry.manualOverride ? "manual-override" : ""}`}
-                        title={`${getEntryLabel(entry)}${entry.location ? ` - ${entry.location}` : ""}`}
+                        title={`${getEntryLabel(entry)}${entry.location ? ` - ${entry.location}` : ""}${entry.notes?.trim() ? " · Tiene notas" : ""}`}
                         aria-label={
-                          entry.isFallback ? `Agregar turno ${entry.period}` : `Editar ${getEntryLabel(entry)}`
+                          `${entry.isFallback ? `Agregar turno ${entry.period}` : `Editar ${getEntryLabel(entry)}`}${entry.notes?.trim() ? ", tiene notas" : ""}`
                         }
                         onClick={(event) => {
                           event.stopPropagation()
@@ -258,6 +270,11 @@ export function CalendarPanel({
                         }}
                       >
                         <span className="day-entry-label">{getEntryLabel(entry)}</span>
+                        {entry.notes?.trim() && (
+                          <span className="day-entry-note-indicator" aria-hidden="true">
+                            <FileText size={9} />
+                          </span>
+                        )}
                         {entry.startTime && <span className="day-entry-time">{entry.startTime}</span>}
                       </button>
                     ))}

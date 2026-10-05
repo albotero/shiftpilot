@@ -38,6 +38,23 @@ function dateKey(date: Date) {
   return date.toISOString().slice(0, 10)
 }
 
+async function getSomaAnnualPlans() {
+  const settings = await prisma.appSetting.findMany({ where: { key: { startsWith: "soma.annualPlan." } } })
+  const plans = new Map<number, SomaAnnualPlan>()
+  for (const setting of settings) {
+    const parsed = somaAnnualPlanSchema.safeParse(setting.value)
+    if (parsed.success) plans.set(parsed.data.year, parsed.data)
+  }
+  return plans
+}
+
+function getAutomaticShiftStatus(date: string, period: ShiftRecordPeriod, plans: ReadonlyMap<number, SomaAnnualPlan>) {
+  const rotationStatus = getSomaAutomaticStatus(date, plans)
+  if (!rotationStatus || rotationStatus === "LIBRE") return undefined
+  if (period === "NOCHE") return rotationStatus === "TURNO" ? "NOCHE" : undefined
+  return rotationStatus
+}
+
 function mapShift(shift: {
   id: string
   date: Date
@@ -137,11 +154,22 @@ export async function POST(request: Request) {
         return Response.json({ error: "El anestesiólogo no existe o está inactivo" }, { status: 404 })
       }
       const work = await prisma.work.findUnique({ where: { name: "Soma" } })
-      if (!work || !entry.status || !entry.period) {
+      if (!work || (!entry.status && !entry.restoreAutomatic) || !entry.period) {
         return Response.json({ error: "Falta la configuración inicial de Soma" }, { status: 409 })
       }
       const periods: ShiftRecordPeriod[] = entry.period === "AM + PM" ? ["AM", "PM"] : [entry.period]
       const date = new Date(`${entry.date}T00:00:00.000Z`)
+      const automaticPlans = entry.restoreAutomatic ? await getSomaAnnualPlans() : undefined
+      const statusByPeriod = new Map<ShiftRecordPeriod, NonNullable<CalendarEntry["status"]>>()
+      for (const period of periods) {
+        const status = entry.restoreAutomatic
+          ? automaticPlans && getAutomaticShiftStatus(entry.date, period, automaticPlans)
+          : entry.status
+        if (!status) {
+          return Response.json({ error: "No hay un turno automático programado para esa jornada." }, { status: 409 })
+        }
+        statusByPeriod.set(period, status)
+      }
       const existingShifts = (await prisma.shift.findMany({ where: { workId: work.id, date } })).filter((shift) =>
         periods.includes(shift.period),
       )
@@ -155,19 +183,7 @@ export async function POST(request: Request) {
       const shifts = await prisma.$transaction(
         periods.map((period) => {
           const existing = existingByPeriod.get(period)
-          const status = entry.status as
-            | "LIBRE"
-            | "R4"
-            | "R3"
-            | "R2"
-            | "R1"
-            | "R5"
-            | "TURNO"
-            | "NOCHE"
-            | "TURNO_OTRA_PERSONA"
-            | "TURNO_DE_OTRA_PERSONA"
-            | "EXTERNO"
-            | "EXTERNO_NOCHE"
+          const status = statusByPeriod.get(period)!
           const replacementId = replacementIdForPeriod(entry, period)
           const replacement = replacementId ? replacementsById.get(replacementId) : undefined
           const data = {
@@ -175,14 +191,16 @@ export async function POST(request: Request) {
             period,
             status,
             durationHours: period === "NOCHE" ? 12 : 6,
-            manualOverride: true,
-            anesthesiologist: replacement?.name || entry.anesthesiologist || null,
+            manualOverride: !entry.restoreAutomatic,
+            anesthesiologist: entry.restoreAutomatic ? null : replacement?.name || entry.anesthesiologist || null,
             notes: entry.notes || null,
           }
           const coverageWrite = {
             coverages: {
               deleteMany: {},
-              ...(replacement ? { create: { person: { connect: { id: replacement.id } } } } : {}),
+              ...(!entry.restoreAutomatic && replacement
+                ? { create: { person: { connect: { id: replacement.id } } } }
+                : {}),
             },
           }
           return existing
@@ -195,7 +213,9 @@ export async function POST(request: Request) {
                 data: {
                   ...data,
                   workId: work.id,
-                  ...(replacement ? { coverages: { create: { person: { connect: { id: replacement.id } } } } } : {}),
+                  ...(!entry.restoreAutomatic && replacement
+                    ? { coverages: { create: { person: { connect: { id: replacement.id } } } } }
+                    : {}),
                 },
                 include: { coverages: { include: { person: true } } },
               })
@@ -285,14 +305,14 @@ export async function PATCH(request: Request) {
 
   try {
     if (parsed.data.kind === "SOMA") {
-      if (!parsed.data.status || !parsed.data.period) {
+      if ((!parsed.data.status && !parsed.data.restoreAutomatic) || !parsed.data.period) {
         return Response.json({ error: "El turno Soma requiere tipo y jornada" }, { status: 400 })
       }
       const isCoverage = parsed.data.status === "TURNO_OTRA_PERSONA" || parsed.data.status === "TURNO_DE_OTRA_PERSONA"
       const hasReplacement = Boolean(
         parsed.data.replacementPersonId || parsed.data.amReplacementPersonId || parsed.data.pmReplacementPersonId,
       )
-      if (hasReplacement && !isCoverage) {
+      if (hasReplacement && (!isCoverage || parsed.data.restoreAutomatic)) {
         return Response.json({ error: "La persona sólo se puede asignar a un turno cubierto" }, { status: 400 })
       }
       if (
@@ -325,10 +345,24 @@ export async function PATCH(request: Request) {
           : await prisma.shift.findMany({ where: { workId: current.workId, date: targetDate } })
       const requestedPeriods: ShiftRecordPeriod[] =
         parsed.data.period === "AM + PM" ? ["AM", "PM"] : [parsed.data.period]
+      const statusByPeriod = new Map<ShiftRecordPeriod, NonNullable<CalendarEntry["status"]>>()
+      const automaticPlans = parsed.data.restoreAutomatic ? await getSomaAnnualPlans() : undefined
+      for (const period of requestedPeriods) {
+        const status = parsed.data.restoreAutomatic
+          ? automaticPlans && getAutomaticShiftStatus(parsed.data.date, period, automaticPlans)
+          : parsed.data.status
+        if (!status) {
+          return Response.json({ error: "No hay un turno automático programado para esa jornada." }, { status: 409 })
+        }
+        statusByPeriod.set(period, status)
+      }
       const pairedShift =
         parsed.data.period === "AM + PM"
           ? sourceDay.find(
-              (shift) => shift.id !== current.id && shift.period !== current.period && shift.status === current.status,
+              (shift) =>
+                shift.id !== current.id &&
+                shift.period !== current.period &&
+                (parsed.data.restoreAutomatic || shift.status === parsed.data.status),
             )
           : undefined
       const primaryPeriod = requestedPeriods.includes(current.period) ? current.period : requestedPeriods[0]
@@ -359,25 +393,36 @@ export async function PATCH(request: Request) {
 
       const updateData = {
         date: targetDate,
-        status: parsed.data.status,
-        durationHours: parsed.data.period === "NOCHE" ? 12 : 6,
-        manualOverride: true,
         notes: parsed.data.notes || null,
       }
       const updatedShifts = await prisma.$transaction(
         requestedPeriods.map((period) => {
+          const status = statusByPeriod.get(period)!
           const replacementId = replacementIdForPeriod(parsed.data, period)
           const replacement = replacementId ? replacementsById.get(replacementId) : undefined
-          const periodUpdateData = {
-            ...updateData,
-            anesthesiologist: replacement?.name || parsed.data.anesthesiologist || null,
-            coverages: {
-              deleteMany: {},
-              ...(replacement ? { create: { person: { connect: { id: replacement.id } } } } : {}),
-            },
-          }
           const existingPeriod =
             period === primaryPeriod ? current : pairedShift?.period === period ? pairedShift : undefined
+          const periodUpdateData = {
+            ...updateData,
+            status,
+            durationHours: period === "NOCHE" ? 12 : 6,
+            manualOverride: !parsed.data.restoreAutomatic,
+            anesthesiologist: parsed.data.restoreAutomatic
+              ? null
+              : replacement?.name || parsed.data.anesthesiologist || null,
+            ...(existingPeriod
+              ? {
+                  coverages: {
+                    deleteMany: {},
+                    ...(!parsed.data.restoreAutomatic && replacement
+                      ? { create: { person: { connect: { id: replacement.id } } } }
+                      : {}),
+                  },
+                }
+              : !parsed.data.restoreAutomatic && replacement
+                ? { coverages: { create: { person: { connect: { id: replacement.id } } } } }
+                : {}),
+          }
           if (existingPeriod) {
             return prisma.shift.update({
               where: { id: existingPeriod.id },
