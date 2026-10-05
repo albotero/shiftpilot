@@ -1068,7 +1068,7 @@ a {
   flex: 0 0 9px;
   place-items: center;
   color: currentColor;
-  opacity: .9;
+  opacity: 0.9;
 }
 
 .day-entry-time {
