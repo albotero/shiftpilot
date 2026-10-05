@@ -157,6 +157,28 @@ describe("calendar availability", () => {
     expect(findScheduleConflicts([vacation, reservedShift])).toMatchObject([{ date: "2026-10-05", type: "VACACIONES" }])
   })
 
+  it("blocks availability throughout a vacation range and reports only in-range conflicts", () => {
+    const vacation: CalendarEntry = {
+      id: "vacation-week",
+      date: "2026-10-07",
+      endDate: "2026-10-13",
+      kind: "VACACIONES",
+      title: "VACACIONES",
+    }
+    const insideShift = { ...reservedShift, id: "inside-shift", date: "2026-10-13", status: "TURNO" as const }
+    const outsideShift = { ...reservedShift, id: "outside-shift", date: "2026-10-14", status: "TURNO" as const }
+
+    for (const date of ["2026-10-07", "2026-10-10", "2026-10-13"]) {
+      expect(getDayAvailability([vacation], date)).toBe("VACACIONES")
+      expect(getEntriesForDate([vacation], new Date(`${date}T12:00:00`))).toContain(vacation)
+    }
+    expect(getDayAvailability([vacation], "2026-10-06")).toBe("LIBRE")
+    expect(getDayAvailability([vacation], "2026-10-14")).toBe("LIBRE")
+    expect(findScheduleConflicts([vacation, insideShift, outsideShift])).toMatchObject([
+      { date: "2026-10-13", firstEntryId: vacation.id, secondEntryId: insideShift.id, type: "VACACIONES" },
+    ])
+  })
+
   it("treats an annual vacation without an end date as open until next year's plan is set", () => {
     const vacation: CalendarEntry = {
       id: "annual-vacation",

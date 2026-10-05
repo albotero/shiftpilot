@@ -20,15 +20,15 @@ const { prismaMock } = vi.hoisted(() => ({
       delete: vi.fn(),
     },
     appSetting: { findMany: vi.fn(), findUnique: vi.fn(), upsert: vi.fn() },
-    event: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
-    vacation: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+    event: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+    vacation: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     $transaction: vi.fn(),
   },
 }))
 
 vi.mock("@/server/db", () => ({ prisma: prismaMock }))
 
-import { DELETE, PATCH, POST } from "./route"
+import { DELETE, GET as getCalendar, PATCH, POST } from "./route"
 import { DELETE as deletePerson, GET as getPeople, POST as createPerson } from "../replacement-people/route"
 import { PUT as saveAnnualPlan } from "../soma/annual-plan/route"
 
@@ -364,6 +364,170 @@ describe("Soma calendar route integration", () => {
       ]),
       skipDuplicates: true,
     })
+  })
+})
+
+describe("Vacation calendar routes", () => {
+  const vacation = {
+    id: "vacation-1",
+    startDate: new Date("2026-10-07T00:00:00.000Z"),
+    endDate: new Date("2026-10-20T00:00:00.000Z"),
+    annualPlanYear: null,
+    notes: "Descanso",
+  }
+
+  it("creates a complete vacation range and returns both dates", async () => {
+    prismaMock.shift.findMany.mockResolvedValue([])
+    prismaMock.event.findMany.mockResolvedValue([])
+    prismaMock.vacation.findMany.mockResolvedValue([])
+    prismaMock.vacation.create.mockResolvedValue(vacation)
+
+    const response = await POST(
+      jsonRequest({
+        id: "vacation-1",
+        date: "2026-10-07",
+        endDate: "2026-10-20",
+        kind: "VACACIONES",
+        title: "VACACIONES",
+        notes: "Descanso",
+      }),
+    )
+
+    expect(response.status).toBe(201)
+    expect(await response.json()).toEqual([
+      {
+        id: vacation.id,
+        date: "2026-10-07",
+        endDate: "2026-10-20",
+        kind: "VACACIONES",
+        title: "VACACIONES",
+        notes: "Descanso",
+      },
+    ])
+    expect(prismaMock.vacation.create).toHaveBeenCalledWith({
+      data: {
+        startDate: vacation.startDate,
+        endDate: vacation.endDate,
+        notes: "Descanso",
+      },
+    })
+  })
+
+  it("rejects a partial-week vacation before writing it", async () => {
+    const response = await POST(
+      jsonRequest({
+        id: "partial-vacation",
+        date: "2026-10-07",
+        endDate: "2026-10-12",
+        kind: "VACACIONES",
+        title: "VACACIONES",
+      }),
+    )
+
+    expect(response.status).toBe(400)
+    expect(prismaMock.vacation.create).not.toHaveBeenCalled()
+  })
+
+  it("returns a vacation period with its end date from calendar GET", async () => {
+    prismaMock.shift.findMany.mockResolvedValue([])
+    prismaMock.event.findMany.mockResolvedValue([])
+    prismaMock.vacation.findMany.mockResolvedValue([vacation])
+
+    const response = await getCalendar()
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual([
+      {
+        id: vacation.id,
+        date: "2026-10-07",
+        endDate: "2026-10-20",
+        kind: "VACACIONES",
+        title: "VACACIONES",
+        notes: "Descanso",
+      },
+    ])
+  })
+
+  it("updates a manual vacation range and its notes", async () => {
+    prismaMock.vacation.findUnique.mockResolvedValue(vacation)
+    prismaMock.vacation.update.mockResolvedValue({
+      ...vacation,
+      startDate: new Date("2026-10-14T00:00:00.000Z"),
+      endDate: new Date("2026-10-27T00:00:00.000Z"),
+      notes: "Fechas nuevas",
+    })
+
+    const response = await PATCH(
+      new Request("http://localhost/api/calendar", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: vacation.id,
+          date: "2026-10-14",
+          endDate: "2026-10-27",
+          kind: "VACACIONES",
+          title: "VACACIONES",
+          notes: "Fechas nuevas",
+        }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject([
+      { id: vacation.id, date: "2026-10-14", endDate: "2026-10-27", notes: "Fechas nuevas" },
+    ])
+    expect(prismaMock.vacation.update).toHaveBeenCalledWith({
+      where: { id: vacation.id },
+      data: {
+        startDate: new Date("2026-10-14T00:00:00.000Z"),
+        endDate: new Date("2026-10-27T00:00:00.000Z"),
+        notes: "Fechas nuevas",
+      },
+    })
+  })
+
+  it("deletes manual vacations but keeps annual-plan vacations read-only", async () => {
+    prismaMock.vacation.findUnique.mockResolvedValue(vacation)
+    const deleted = await DELETE(
+      new Request("http://localhost/api/calendar", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: vacation.id, kind: "VACACIONES" }),
+      }),
+    )
+
+    expect(deleted.status).toBe(200)
+    expect(prismaMock.vacation.delete).toHaveBeenCalledWith({ where: { id: vacation.id } })
+
+    vi.resetAllMocks()
+    configureTransactions()
+    const annualVacation = { ...vacation, annualPlanYear: 2026 }
+    prismaMock.vacation.findUnique.mockResolvedValue(annualVacation)
+    const edited = await PATCH(
+      new Request("http://localhost/api/calendar", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: vacation.id,
+          date: "2026-10-14",
+          endDate: "2026-10-27",
+          kind: "VACACIONES",
+          title: "VACACIONES",
+        }),
+      }),
+    )
+    const removed = await DELETE(
+      new Request("http://localhost/api/calendar", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: vacation.id, kind: "VACACIONES" }),
+      }),
+    )
+
+    expect(edited.status).toBe(409)
+    expect(removed.status).toBe(409)
+    expect(prismaMock.vacation.update).not.toHaveBeenCalled()
+    expect(prismaMock.vacation.delete).not.toHaveBeenCalled()
   })
 })
 

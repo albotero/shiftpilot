@@ -240,7 +240,7 @@ export function CalendarPanel({
                         type="button"
                         key={entry.id}
                         className={`day-entry ${getEntryTone(entry)} ${entry.manualOverride ? "manual-override" : ""}`}
-                        title={`${getEntryLabel(entry)}${entry.location ? ` - ${entry.location}` : ""}${entry.manualOverride ? " · Ajuste manual" : ""}`}
+                        title={`${getEntryLabel(entry)}${entry.location ? ` - ${entry.location}` : ""}`}
                         aria-label={
                           entry.isFallback ? `Agregar turno ${entry.period}` : `Editar ${getEntryLabel(entry)}`
                         }
