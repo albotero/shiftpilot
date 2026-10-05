@@ -368,14 +368,8 @@ export async function DELETE(request: Request) {
       if (!current || current.work.name !== "Soma") {
         return Response.json({ error: "No se encontró el turno Soma" }, { status: 404 })
       }
-      if (
-        !current.manualOverride ||
-        (current.status !== "TURNO_OTRA_PERSONA" && current.status !== "TURNO_DE_OTRA_PERSONA")
-      ) {
-        return Response.json(
-          { error: "Este turno no tiene una cobertura manual que se pueda restaurar" },
-          { status: 409 },
-        )
+      if (!current.manualOverride) {
+        return Response.json({ error: "Este turno no tiene un ajuste manual que se pueda restaurar" }, { status: 409 })
       }
 
       const date = dateKey(current.date)
@@ -400,12 +394,10 @@ export async function DELETE(request: Request) {
       const rotationStatus = getSomaAutomaticStatus(date, plans)
       const automaticStatus =
         current.period === "NOCHE" ? (rotationStatus === "TURNO" ? "NOCHE" : "LIBRE") : rotationStatus
-      if (automaticStatus === undefined) {
-        return Response.json({ error: "No hay una rotación automática configurada para esta fecha" }, { status: 409 })
-      }
+      const restoredStatus = automaticStatus ?? "LIBRE"
 
       const shiftsToRestore = [current, ...(pairedShift ? [pairedShift] : [])]
-      if (automaticStatus === "LIBRE") {
+      if (restoredStatus === "LIBRE") {
         await prisma.$transaction(shiftsToRestore.map((shift) => prisma.shift.delete({ where: { id: shift.id } })))
         return Response.json({ restored: true, entries: [], removedIds: shiftsToRestore.map((shift) => shift.id) })
       }
@@ -415,7 +407,7 @@ export async function DELETE(request: Request) {
           prisma.shift.update({
             where: { id: shift.id },
             data: {
-              status: automaticStatus,
+              status: restoredStatus,
               durationHours: shift.period === "NOCHE" ? 12 : 6,
               manualOverride: false,
               anesthesiologist: null,

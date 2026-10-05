@@ -172,6 +172,69 @@ describe("Soma calendar route integration", () => {
     )
   })
 
+  it("restores a manual R5 shift to the planned TURNO status", async () => {
+    const manualR5 = {
+      ...automaticNight,
+      id: "manual-r5-am",
+      period: "AM",
+      status: "R5",
+      manualOverride: true,
+    }
+    prismaMock.shift.findUnique.mockResolvedValue({ ...manualR5, work: somaWork })
+    prismaMock.shift.findMany.mockResolvedValue([manualR5])
+    prismaMock.appSetting.findMany.mockResolvedValue([{ key: "soma.annualPlan.2026", value: plan2026 }])
+    prismaMock.shift.update.mockImplementation(async ({ where, data }: { where: { id: string }; data: object }) => ({
+      ...manualR5,
+      ...data,
+      id: where.id,
+    }))
+
+    const response = await DELETE(
+      new Request("http://localhost/api/calendar", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: manualR5.id, kind: "SOMA" }),
+      }),
+    )
+    const result = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(result.entries).toMatchObject([{ id: manualR5.id, status: "TURNO", period: "AM" }])
+    expect(prismaMock.shift.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: manualR5.id },
+        data: expect.objectContaining({ status: "TURNO", durationHours: 6, manualOverride: false }),
+      }),
+    )
+  })
+
+  it("removes a manual shift when no automatic rotation is planned", async () => {
+    const manualR5 = {
+      ...automaticNight,
+      id: "manual-r5-unplanned",
+      date: new Date("2032-01-13T00:00:00.000Z"),
+      period: "AM",
+      status: "R5",
+      manualOverride: true,
+    }
+    prismaMock.shift.findUnique.mockResolvedValue({ ...manualR5, work: somaWork })
+    prismaMock.shift.findMany.mockResolvedValue([manualR5])
+    prismaMock.appSetting.findMany.mockResolvedValue([])
+
+    const response = await DELETE(
+      new Request("http://localhost/api/calendar", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: manualR5.id, kind: "SOMA" }),
+      }),
+    )
+    const result = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(result).toMatchObject({ restored: true, entries: [], removedIds: [manualR5.id] })
+    expect(prismaMock.shift.delete).toHaveBeenCalledWith({ where: { id: manualR5.id } })
+  })
+
   it("generates a 12-hour NOCHE row for each TURNO day in an annual plan", async () => {
     prismaMock.work.findUnique.mockResolvedValue(somaWork)
 

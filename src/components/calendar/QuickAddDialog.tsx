@@ -69,11 +69,7 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
     initialEntry.kind !== "SOMA" &&
     !(initialEntry.kind === "VACACIONES" && initialEntry.annualPlanYear),
   )
-  const canRestoreRotation = Boolean(
-    initialEntry?.kind === "SOMA" &&
-    initialEntry.manualOverride &&
-    (initialEntry.status === "TURNO_OTRA_PERSONA" || initialEntry.status === "TURNO_DE_OTRA_PERSONA"),
-  )
+  const canRestoreRotation = Boolean(initialEntry?.kind === "SOMA" && initialEntry.manualOverride)
   const isCoverageStatus = status === "TURNO_OTRA_PERSONA" || status === "TURNO_DE_OTRA_PERSONA"
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -362,7 +358,7 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
             <div className={`delete-confirmation ${canRestoreRotation ? "restore-confirmation" : ""}`} role="alert">
               <span>
                 {canRestoreRotation
-                  ? "¿Restaurar la rotación automática de esta jornada?"
+                  ? "¿Restaurar la rotación automática? Si no hay turno programado, se quitará el ajuste manual."
                   : "¿Eliminar este registro? Esta acción no se puede deshacer."}
               </span>
               <button
