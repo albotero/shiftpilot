@@ -140,6 +140,13 @@ Guarda las copias fuera del volumen del servidor, protégelas como datos privado
 
 ## Alcance actual
 
-Implementado: calendario mensual, semanal y agenda; filtros y alta de turnos Soma, reservas, eventos y vacaciones; persistencia de calendario vía PostgreSQL con fallback local; modelos y cálculos base de facturación, IBC, seguridad social y deuda; carga del plan original y pruebas para sus reglas principales.
+Implementado: calendario mensual, semanal y agenda; turnos Soma, reservas, eventos, vacaciones y cobertura; persistencia vía PostgreSQL con fallback local; facturación end-to-end con CRUD, partidas, cálculos por tipo, vencimientos y resumen mensual; cálculos base de IBC, seguridad social y deuda; carga del plan original y pruebas para sus reglas principales.
 
-Pendiente: pantallas y operaciones completas de facturación y seguridad social, pagos reales/asignación de deuda, cobertura de turnos, configuración editable y reportes. Revisa el estado del código antes de basar un proceso financiero en datos de la interfaz.
+Pendiente: integrar seguridad social con la facturación mensual, pagos reales/asignación de deuda, configuración editable y reportes. Los cálculos actuales de IBC y aportes son funciones base; todavía no se recalculan ni persisten automáticamente a partir de las facturas.
+
+### Pruebas obligatorias para la Fase 9 — Seguridad social
+
+- Verificar que el IBC mensual se derive del neto de las facturas del mismo mes después de descuentos, incluyendo facturas POS, prepagadas, particulares y Sedarte; comprobar que crear, editar o eliminar una factura actualiza el resultado una sola vez y no afecta otros meses.
+- Probar el IBC del 40% y cada aporte: salud 12.5%, pensión 16%, ARL 2.436% y caja 1%. Confirmar que las tasas configuradas se usan en el cálculo y que el redondeo hacia arriba se aplica por separado a cada componente.
+- Cubrir importes cero, valores que caen justo antes/en/después de un umbral de redondeo, netos pequeños y valores con descuentos o jornadas particulares; contrastar componente y total esperados.
+- Añadir pruebas de integración para lectura/configuración y persistencia del período mensual, y confirmar que recalcular no duplica aportes ni altera facturas o sus totales.

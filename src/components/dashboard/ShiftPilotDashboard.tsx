@@ -18,9 +18,11 @@ import {
   Settings2,
   ShieldCheck,
   Wallet,
+  X,
 } from "lucide-react"
 import { CalendarPanel } from "@/components/calendar/CalendarPanel"
 import { ReplacementPeopleManager } from "@/components/calendar/ReplacementPeopleManager"
+import { InvoiceManager } from "@/components/billing/InvoiceManager"
 import { DebtSummaryCard } from "@/components/debt/DebtSummaryCard"
 import { QuickAddDialog } from "@/components/calendar/QuickAddDialog"
 import { SomaAnnualPlanForm } from "@/components/calendar/SomaAnnualPlanForm"
@@ -56,7 +58,9 @@ export function ShiftPilotDashboard() {
   const [dialogDate, setDialogDate] = useState<Date | null>(null)
   const [editingEntry, setEditingEntry] = useState<CalendarEntry | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [invoiceSummary, setInvoiceSummary] = useState({ count: 0, netAmount: 0 })
 
+  const activeMonth = format(activeDate, "yyyy-MM")
   const monthEntries = entries.filter((entry) => isSameMonth(new Date(`${entry.date}T12:00:00`), activeDate))
   const shiftCount = getMonthSomaShiftCount(monthEntries, activeDate)
   const eventCount = monthEntries.filter((entry) => entry.kind === "SEDARTE" || entry.kind === "PERSONAL").length
@@ -102,17 +106,27 @@ export function ShiftPilotDashboard() {
 
   return (
     <div className="app-shell">
-      <aside className={`sidebar ${mobileMenuOpen ? "mobile-open" : ""}`}>
-        <a className="brand" href="#top" aria-label="ShiftPilot inicio">
-          <span className="brand-mark">
-            <Activity size={20} strokeWidth={2.5} />
-          </span>
-          <span>
-            shiftpilot<span className="brand-period">.</span>
-          </span>
-        </a>
+      <aside id="primary-navigation-drawer" className={`sidebar ${mobileMenuOpen ? "mobile-open" : ""}`}>
+        <div className="sidebar-header">
+          <a className="brand" href="#top" aria-label="ShiftPilot inicio" onClick={() => setMobileMenuOpen(false)}>
+            <span className="brand-mark">
+              <Activity size={20} strokeWidth={2.5} />
+            </span>
+            <span>
+              shiftpilot<span className="brand-period">.</span>
+            </span>
+          </a>
+          <button
+            className="mobile-sidebar-close"
+            type="button"
+            aria-label="Cerrar menú"
+            onClick={() => setMobileMenuOpen(false)}
+          >
+            <X size={18} />
+          </button>
+        </div>
         <div className="workspace-label">CENTRO PERSONAL</div>
-        <nav className="primary-nav" aria-label="Navegación principal">
+        <nav className="primary-nav" aria-label="Navegación principal" onClick={() => setMobileMenuOpen(false)}>
           <a className="nav-link active" href="#top">
             <LayoutDashboard size={17} />
             <span>Resumen</span>
@@ -142,7 +156,7 @@ export function ShiftPilotDashboard() {
                   : "Modo de navegador · PostgreSQL sin conexión"}
             </span>
           </div>
-          <a className="nav-link settings-link" href="#settings">
+          <a className="nav-link settings-link" href="#settings" onClick={() => setMobileMenuOpen(false)}>
             <Settings2 size={17} />
             <span>Configuración</span>
           </a>
@@ -161,10 +175,12 @@ export function ShiftPilotDashboard() {
         <header className="topbar">
           <button
             className="mobile-menu-button"
-            aria-label="Abrir menú"
+            aria-label={mobileMenuOpen ? "Cerrar menú" : "Abrir menú"}
+            aria-expanded={mobileMenuOpen}
+            aria-controls="primary-navigation-drawer"
             onClick={() => setMobileMenuOpen((open) => !open)}
           >
-            <Menu size={20} />
+            {mobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
           </button>
           <div className="breadcrumb">
             <span>ShiftPilot</span>
@@ -239,13 +255,17 @@ export function ShiftPilotDashboard() {
                 </span>
               </div>
               <div className="stat-value stat-money">
-                —<small>miles COP</small>
+                {new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(invoiceSummary.netAmount)}
+                <small>miles COP</small>
               </div>
               <div className="stat-foot">
                 <span className="stat-trend green-text">
-                  <ArrowDownRight size={14} /> Sin facturas
+                  <ArrowDownRight size={14} />
+                  {invoiceSummary.count === 0
+                    ? "Sin facturas"
+                    : `${invoiceSummary.count} factura${invoiceSummary.count === 1 ? "" : "s"}`}
                 </span>
-                <span>Registra tu primera</span>
+                <span>en {format(startOfMonth(activeDate), "MMMM", { locale: es })}</span>
               </div>
             </article>
             <article className="stat-card stat-ibc">
@@ -396,6 +416,7 @@ export function ShiftPilotDashboard() {
             </aside>
           </div>
 
+          <InvoiceManager month={activeMonth} onSummaryChange={setInvoiceSummary} />
           <SomaAnnualPlanForm />
           <ReplacementPeopleManager />
 

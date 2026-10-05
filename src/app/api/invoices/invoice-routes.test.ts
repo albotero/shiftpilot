@@ -1,0 +1,180 @@
+import { beforeEach, describe, expect, it, vi } from "vitest"
+
+const prismaMock = vi.hoisted(() => ({
+  prisma: {
+    invoice: { findMany: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+    work: { findUnique: vi.fn() },
+    appSetting: { findMany: vi.fn() },
+  },
+}))
+
+vi.mock("@/server/db", () => ({ prisma: prismaMock.prisma }))
+
+import { DELETE, GET, PATCH, POST } from "./route"
+
+const settings = [
+  { key: "billing.pos.paymentDays", value: 90 },
+  { key: "billing.pos.discountPpm", value: 120_000 },
+  { key: "billing.prepaid.paymentDays", value: 60 },
+  { key: "billing.prepaid.discountPpm", value: 200_000 },
+  { key: "billing.particular.paymentDays", value: 30 },
+  { key: "billing.particular.discountPpm", value: 120_000 },
+  { key: "billing.particular.shiftAmount", value: 685 },
+]
+
+function jsonRequest(method: string, body: unknown) {
+  return new Request("http://localhost/api/invoices", {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  })
+}
+
+beforeEach(() => {
+  vi.resetAllMocks()
+  prismaMock.prisma.appSetting.findMany.mockResolvedValue(settings)
+  prismaMock.prisma.work.findUnique.mockImplementation(async ({ where }: { where: { name: string } }) => ({
+    id: `${where.name.toLowerCase()}-work`,
+    name: where.name,
+  }))
+})
+
+describe("invoice routes", () => {
+  it("creates a POS invoice with separate shift discount and due date", async () => {
+    prismaMock.prisma.invoice.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
+      id: "invoice-pos",
+      ...data,
+      invoiceDate: new Date("2026-10-03T00:00:00.000Z"),
+      expectedPaymentDate: new Date("2027-01-01T00:00:00.000Z"),
+      items: [{ id: "item-pos", description: "Servicio", quantity: 1, unitAmount: 1000, grossAmount: 1000 }],
+    }))
+
+    const response = await POST(
+      jsonRequest("POST", {
+        type: "SOMA_POS",
+        serviceDate: "2026-10-01",
+        invoiceDate: "2026-10-03",
+        status: "FACTURADA",
+        shiftDiscountAmount: 50,
+        items: [{ description: "Servicio", quantity: 1, unitAmount: 1000 }],
+      }),
+    )
+    const invoice = await response.json()
+
+    expect(response.status).toBe(201)
+    expect(invoice).toMatchObject({
+      grossAmount: 1000,
+      discountAmount: 120,
+      shiftDiscountAmount: 50,
+      netAmount: 830,
+      expectedPaymentDate: "2027-01-01",
+      items: [{ description: "Servicio", grossAmount: 1000 }],
+    })
+    expect(prismaMock.prisma.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          workId: "soma-work",
+          expectedPaymentDate: new Date("2027-01-01T00:00:00.000Z"),
+          items: { create: [{ description: "Servicio", quantity: 1, unitAmount: 1000, grossAmount: 1000 }] },
+        }),
+        include: { items: true },
+      }),
+    )
+  })
+
+  it("filters invoice reads by service month", async () => {
+    prismaMock.prisma.invoice.findMany.mockResolvedValue([])
+    const response = await GET(new Request("http://localhost/api/invoices?month=2026-10"))
+
+    expect(response.status).toBe(200)
+    expect(prismaMock.prisma.invoice.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: {
+          serviceDate: {
+            gte: new Date("2026-10-01T00:00:00.000Z"),
+            lt: new Date("2026-11-01T00:00:00.000Z"),
+          },
+        },
+      }),
+    )
+  })
+
+  it("returns configured calculation settings and a summary for the billing dashboard", async () => {
+    prismaMock.prisma.invoice.findMany.mockResolvedValue([])
+
+    const response = await GET(new Request("http://localhost/api/invoices?month=2026-10&includeMeta=true"))
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      invoices: [],
+      calculationSettings: {
+        posDiscountRatePpm: 120_000,
+        prepaidDiscountRatePpm: 200_000,
+        particularDiscountRatePpm: 120_000,
+        privateShiftAmount: 685,
+      },
+      paymentDays: { SOMA_POS: 90, SOMA_PREPAGADA: 60, SOMA_PARTICULAR: 30, SEDARTE: 0 },
+      summary: { count: 0, netAmount: 0 },
+    })
+  })
+
+  it("returns calculation settings, payment terms, and a monthly net summary", async () => {
+    prismaMock.prisma.invoice.findMany.mockResolvedValue([])
+
+    const response = await GET(new Request("http://localhost/api/invoices?month=2026-10&includeMeta=true"))
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      invoices: [],
+      calculationSettings: {
+        posDiscountRatePpm: 120_000,
+        prepaidDiscountRatePpm: 200_000,
+        particularDiscountRatePpm: 120_000,
+        privateShiftAmount: 685,
+      },
+      paymentDays: { SOMA_POS: 90, SOMA_PREPAGADA: 60, SOMA_PARTICULAR: 30, SEDARTE: 0 },
+      summary: { count: 0, netAmount: 0 },
+    })
+  })
+
+  it("replaces invoice items on update and deletes the invoice", async () => {
+    prismaMock.prisma.invoice.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
+      id: "invoice-sedarte",
+      ...data,
+      invoiceDate: null,
+      expectedPaymentDate: new Date("2026-10-07T00:00:00.000Z"),
+      items: [{ id: "item-sedarte", description: "Procedimiento", quantity: 1, unitAmount: 1500, grossAmount: 1500 }],
+    }))
+    prismaMock.prisma.invoice.delete.mockResolvedValue({ id: "invoice-sedarte" })
+
+    const response = await PATCH(
+      jsonRequest("PATCH", {
+        id: "invoice-sedarte",
+        type: "SEDARTE",
+        serviceDate: "2026-10-07",
+        status: "PENDIENTE",
+        notes: "Actualizada",
+        items: [{ description: "Procedimiento", quantity: 1, unitAmount: 1500 }],
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(prismaMock.prisma.invoice.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "invoice-sedarte" },
+        data: expect.objectContaining({ items: { deleteMany: {}, create: expect.any(Array) } }),
+      }),
+    )
+
+    const deleted = await DELETE(jsonRequest("DELETE", { id: "invoice-sedarte" }))
+    expect(deleted.status).toBe(200)
+    expect(prismaMock.prisma.invoice.delete).toHaveBeenCalledWith({ where: { id: "invoice-sedarte" } })
+  })
+
+  it("rejects invalid service-month filters", async () => {
+    const response = await GET(new Request("http://localhost/api/invoices?month=2026-13"))
+
+    expect(response.status).toBe(400)
+    expect(prismaMock.prisma.invoice.findMany).not.toHaveBeenCalled()
+  })
+})

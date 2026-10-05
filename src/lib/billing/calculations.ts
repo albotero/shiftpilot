@@ -7,7 +7,12 @@ export const DEFAULT_BILLING_SETTINGS = {
   privateShiftAmount: 685,
 } as const
 
-export type BillingSettings = typeof DEFAULT_BILLING_SETTINGS
+export type BillingSettings = {
+  posDiscountRatePpm: number
+  prepaidDiscountRatePpm: number
+  particularDiscountRatePpm: number
+  privateShiftAmount: number
+}
 
 export type InvoiceCalculation = {
   grossAmount: number
