@@ -132,14 +132,18 @@ export function isSomaWorkStatus(status: CalendarEntry["status"]) {
 }
 
 export function getMonthSomaShiftCount(entries: CalendarEntry[], date: Date) {
-  return entries.filter(
-    (entry) =>
+  return entries.reduce((total, entry) => {
+    if (
       entry.kind === "SOMA" &&
       entry.status !== undefined &&
       entry.status !== "LIBRE" &&
       entry.status !== "TURNO_OTRA_PERSONA" &&
-      isSameMonth(new Date(`${entry.date}T12:00:00`), date),
-  ).length
+      isSameMonth(new Date(`${entry.date}T12:00:00`), date)
+    ) {
+      return total + (entry.period === "NOCHE" || entry.period === "AM + PM" ? 2 : 1)
+    }
+    return total
+  }, 0)
 }
 
 export function getEntryKindLabel(kind: CalendarEntryKind) {

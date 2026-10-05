@@ -75,7 +75,7 @@ describe("calendar availability", () => {
     expect(isSomaWorkStatus(borrowedShift.status)).toBe(true)
     expect(getEntryLabel(borrowedShift)).toBe("Verónica AM + PM")
     expect(getEntryTone(borrowedShift)).toBe("borrowed-shift")
-    expect(getMonthSomaShiftCount([borrowedShift], new Date("2026-10-01T12:00:00"))).toBe(1)
+    expect(getMonthSomaShiftCount([borrowedShift], new Date("2026-10-01T12:00:00"))).toBe(2)
     expect(getMonthShiftHours([borrowedShift], new Date("2026-10-01T12:00:00"))).toBe(12)
   })
 
@@ -94,7 +94,7 @@ describe("calendar availability", () => {
     expect(getDayAvailability([nightShift], "2026-10-05")).toBe("OCUPADO")
     expect(dayEntries.some((entry) => entry.isFallback && entry.period === "AM")).toBe(true)
     expect(dayEntries.some((entry) => entry.isFallback && entry.period === "PM")).toBe(true)
-    expect(getMonthSomaShiftCount([nightShift], new Date("2026-10-01T12:00:00"))).toBe(1)
+    expect(getMonthSomaShiftCount([nightShift], new Date("2026-10-01T12:00:00"))).toBe(2)
     expect(getMonthShiftHours([nightShift], new Date("2026-10-01T12:00:00"))).toBe(12)
   })
 

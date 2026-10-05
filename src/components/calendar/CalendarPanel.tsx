@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { addDays, addMonths, eachDayOfInterval, format, isSameMonth, isToday, subMonths } from "date-fns"
 import { ArrowLeft, ArrowRight, CalendarDays, ChevronDown, Plus } from "lucide-react"
 import { es } from "date-fns/locale"
@@ -42,6 +43,7 @@ export function CalendarPanel({
   onEdit,
   onFiltersChange,
 }: CalendarPanelProps) {
+  const [expandedDate, setExpandedDate] = useState<string | null>(null)
   const visibleDays = getVisibleDays(activeDate, view)
   const visibleEntries = entries.filter((entry) => filters[entry.kind])
   const agendaEnd = addDays(activeDate, 30)
@@ -185,14 +187,26 @@ export function CalendarPanel({
           </div>
           <div className={`calendar-grid ${view === "week" ? "week-grid" : ""}`}>
             {visibleDays.map((day) => {
+              const date = toDateKey(day)
               const dayEntries = getEntriesForDate(visibleEntries, day, filters.SOMA)
+              const visibleEntryLimit = view === "week" ? 4 : 3
+              const isExpanded = expandedDate === date
+              const hiddenEntryCount = Math.max(0, dayEntries.length - visibleEntryLimit)
               const inMonth = isSameMonth(day, activeDate)
-              const holiday = getColombianHoliday(toDateKey(day))
+              const holiday = getColombianHoliday(date)
               return (
                 <div
-                  key={toDateKey(day)}
+                  key={date}
                   className={`calendar-day ${inMonth ? "in-month" : "outside-month"} ${isToday(day) ? "is-today" : ""} ${holiday ? "is-holiday" : ""}`}
                   onClick={() => onAdd(day)}
+                  onBlur={(event) => {
+                    if (
+                      expandedDate === date &&
+                      (!event.relatedTarget || !event.currentTarget.contains(event.relatedTarget as Node))
+                    ) {
+                      setExpandedDate(null)
+                    }
+                  }}
                   role="group"
                   aria-label={`${formatLongDate(day)}.${holiday ? ` Festivo: ${holiday.name}.` : ""}`}
                 >
@@ -213,12 +227,12 @@ export function CalendarPanel({
                     </span>
                   )}
                   <span className="day-entries">
-                    {dayEntries.slice(0, view === "week" ? 4 : 3).map((entry) => (
+                    {dayEntries.slice(0, isExpanded ? dayEntries.length : visibleEntryLimit).map((entry) => (
                       <button
                         type="button"
                         key={entry.id}
                         className={`day-entry ${getEntryTone(entry)} ${entry.manualOverride ? "manual-override" : ""}`}
-                        title={`${getEntryLabel(entry)}${entry.manualOverride ? " · Ajuste manual" : ""}`}
+                        title={`${getEntryLabel(entry)}${entry.location ? ` - ${entry.location}` : ""}${entry.manualOverride ? " · Ajuste manual" : ""}`}
                         aria-label={
                           entry.isFallback ? `Agregar turno ${entry.period}` : `Editar ${getEntryLabel(entry)}`
                         }
@@ -232,8 +246,18 @@ export function CalendarPanel({
                         {entry.startTime && <span className="day-entry-time">{entry.startTime}</span>}
                       </button>
                     ))}
-                    {dayEntries.length > (view === "week" ? 4 : 3) && (
-                      <span className="more-entries">+{dayEntries.length - (view === "week" ? 4 : 3)} más</span>
+                    {hiddenEntryCount > 0 && (
+                      <button
+                        type="button"
+                        className="more-entries"
+                        aria-expanded={isExpanded}
+                        onClick={(event) => {
+                          event.stopPropagation()
+                          setExpandedDate(isExpanded ? null : date)
+                        }}
+                      >
+                        {isExpanded ? "Mostrar menos" : `+${hiddenEntryCount} más`}
+                      </button>
                     )}
                   </span>
                   <button

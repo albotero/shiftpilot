@@ -9,6 +9,7 @@
   --forest: #173d35;
   --leaf: #9cdb53;
   --tomato: #ed745a;
+  --personal-orange: #dc8a2e;
   --blue: #55a8cb;
   --lilac: #a294e5;
   --sun: #f1c952;
@@ -656,7 +657,7 @@ a {
 .filter-chip.personal .filter-dot,
 .entry-dot.personal,
 .legend-swatch.personal {
-  background: var(--tomato);
+  background: var(--personal-orange);
 }
 
 .filter-chip.vacaciones .filter-dot,
@@ -854,8 +855,8 @@ a {
 }
 
 .day-entry.personal {
-  background: #ffe4d9;
-  color: #904d3d;
+  background: #ffedd2;
+  color: #80511f;
 }
 
 .day-entry.vacation {
@@ -869,8 +870,23 @@ a {
 }
 
 .more-entries {
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  padding: 0;
+  border: 0;
+  background: transparent;
   color: #869089;
+  cursor: pointer;
   font-size: 8px;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.more-entries:hover {
+  color: #415f49;
+  text-decoration: underline;
 }
 
 .day-add {
@@ -1090,7 +1106,7 @@ a {
 }
 
 .upcoming-mark.personal {
-  background: var(--tomato);
+  background: var(--personal-orange);
 }
 
 .upcoming-mark.vacation {
