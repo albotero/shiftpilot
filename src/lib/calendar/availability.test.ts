@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest"
-import { findScheduleConflicts, getDayAvailability } from "@/lib/calendar/availability"
+import { findScheduleConflicts, getDayAvailability, somaShiftWindows } from "@/lib/calendar/availability"
 import {
+  getCalendarEntryStartMinute,
   getEntryLabel,
   getEntryTone,
   getEntriesForDate,
@@ -20,6 +21,32 @@ const reservedShift: CalendarEntry = {
 }
 
 describe("calendar availability", () => {
+  it("orders month and week day entries by actual start time", () => {
+    const additionalAm: CalendarEntry = { ...reservedShift, status: "R5", period: "AM" }
+    const sedarte: CalendarEntry = {
+      id: "early-sedarte",
+      date: reservedShift.date,
+      kind: "SEDARTE",
+      title: "Sedarte 06:30",
+      startTime: "06:30",
+      durationHours: 1,
+    }
+    const personal: CalendarEntry = {
+      id: "midday-personal",
+      date: reservedShift.date,
+      kind: "PERSONAL",
+      title: "Cita 12:30",
+      startTime: "12:30",
+      durationHours: 1,
+    }
+    const reservedPm: CalendarEntry = { ...reservedShift, id: "r3-pm", status: "R3", period: "PM" }
+    const sorted = getEntriesForDate([reservedPm, additionalAm, personal, sedarte], new Date("2026-10-05T12:00:00"))
+
+    expect(sorted.map(getEntryLabel)).toEqual(["Sedarte 06:30", "Adicional AM", "Cita 12:30", "R3 PM"])
+    expect(getCalendarEntryStartMinute(additionalAm)).toBe(420)
+    expect(getCalendarEntryStartMinute(reservedPm)).toBe(780)
+  })
+
   it("keeps a Soma reservation distinct from free time", () => {
     expect(getDayAvailability([reservedShift], "2026-10-05")).toBe("RESERVA")
     expect(getDayAvailability([{ ...reservedShift, status: "R2" }], "2026-10-05")).toBe("RESERVA")
@@ -104,6 +131,7 @@ describe("calendar availability", () => {
     expect(getEntryLabel(nightShift)).toBe("NOCHE")
     expect(getEntryTone(nightShift)).toBe(getEntryTone({ ...nightShift, status: "TURNO", period: "AM" }))
     expect(getDayAvailability([nightShift], "2026-10-05")).toBe("OCUPADO")
+    expect(getDayAvailability([nightShift], "2026-10-06")).toBe("OCUPADO")
     expect(dayEntries.some((entry) => entry.isFallback && entry.period === "AM")).toBe(true)
     expect(dayEntries.some((entry) => entry.isFallback && entry.period === "PM")).toBe(true)
     expect(getMonthSomaShiftCount([nightShift], new Date("2026-10-01T12:00:00"))).toBe(2)
@@ -165,6 +193,68 @@ describe("calendar availability", () => {
 
     expect(findScheduleConflicts([sedarte, personal])).toMatchObject([
       { date: "2026-10-05", firstEntryId: sedarte.id, secondEntryId: personal.id, type: "HORARIO" },
+    ])
+  })
+
+  it("detects a full-day personal event against a worked Soma shift without assumed shift hours", () => {
+    const allDayEvent: CalendarEntry = {
+      id: "personal-all-day",
+      date: "2026-10-05",
+      kind: "PERSONAL",
+      title: "Día personal",
+    }
+    const workedShift: CalendarEntry = { ...reservedShift, status: "TURNO" }
+    const coveredBySomeoneElse: CalendarEntry = { ...reservedShift, status: "TURNO_OTRA_PERSONA" }
+
+    expect(findScheduleConflicts([allDayEvent, workedShift])).toMatchObject([
+      { date: "2026-10-05", firstEntryId: allDayEvent.id, secondEntryId: workedShift.id, type: "HORARIO" },
+    ])
+    expect(findScheduleConflicts([allDayEvent, coveredBySomeoneElse])).toEqual([])
+  })
+
+  it("uses Soma AM and PM boundaries and carries NOCHE conflicts into the next day", () => {
+    const amShift: CalendarEntry = { ...reservedShift, status: "TURNO", period: "AM" }
+    const pmShift: CalendarEntry = { ...reservedShift, id: "pm-shift", status: "TURNO", period: "PM" }
+    const nightShift: CalendarEntry = {
+      ...reservedShift,
+      id: "night-shift",
+      date: "2026-10-05",
+      status: "NOCHE",
+      period: "NOCHE",
+    }
+    const eventAtPmStart: CalendarEntry = {
+      id: "pm-start-event",
+      date: "2026-10-05",
+      kind: "SEDARTE",
+      title: "Inicio PM",
+      startTime: "13:00",
+      durationHours: 0.5,
+    }
+    const eventAtPmEnd: CalendarEntry = {
+      ...eventAtPmStart,
+      id: "pm-end-event",
+      startTime: "19:00",
+    }
+    const overnightEvent: CalendarEntry = {
+      ...eventAtPmStart,
+      id: "overnight-event",
+      date: "2026-10-06",
+      startTime: "06:30",
+      durationHours: 1,
+    }
+
+    expect(somaShiftWindows).toEqual({
+      AM: { startTime: "07:00", durationMinutes: 360 },
+      PM: { startTime: "13:00", durationMinutes: 360 },
+      NOCHE: { startTime: "19:00", durationMinutes: 720 },
+    })
+    expect(findScheduleConflicts([amShift, eventAtPmStart], somaShiftWindows)).toEqual([])
+    expect(findScheduleConflicts([pmShift, eventAtPmStart], somaShiftWindows)).toMatchObject([
+      { date: "2026-10-05", type: "HORARIO" },
+    ])
+    expect(findScheduleConflicts([pmShift, eventAtPmEnd], somaShiftWindows)).toEqual([])
+    expect(findScheduleConflicts([nightShift, overnightEvent], somaShiftWindows)).toMatchObject([
+      { date: "2026-10-06", firstEntryId: nightShift.id, secondEntryId: overnightEvent.id, type: "HORARIO" },
     ])
   })
 

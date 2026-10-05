@@ -24,7 +24,7 @@ import { ReplacementPeopleManager } from "@/components/calendar/ReplacementPeopl
 import { DebtSummaryCard } from "@/components/debt/DebtSummaryCard"
 import { QuickAddDialog } from "@/components/calendar/QuickAddDialog"
 import { SomaAnnualPlanForm } from "@/components/calendar/SomaAnnualPlanForm"
-import { findScheduleConflicts, getDayAvailability } from "@/lib/calendar/availability"
+import { findScheduleConflicts, getDayAvailability, somaShiftWindows } from "@/lib/calendar/availability"
 import {
   formatLongDate,
   getEntryLabel,
@@ -63,7 +63,8 @@ export function ShiftPilotDashboard() {
   const shiftHours = getMonthShiftHours(entries, activeDate)
   const todayLabel = formatLongDate(new Date())
   const todayAvailability = getDayAvailability(entries, format(new Date(), "yyyy-MM-dd"))
-  const scheduleConflicts = findScheduleConflicts(entries)
+  const scheduleConflicts = findScheduleConflicts(entries, somaShiftWindows)
+  const entriesById = new Map(entries.map((entry) => [entry.id, entry]))
   const availabilityLabels = {
     LIBRE: "Libre",
     RESERVA: "Reserva Soma",
@@ -359,6 +360,34 @@ export function ShiftPilotDashboard() {
                       {scheduleConflicts.length} conflicto{scheduleConflicts.length === 1 ? "" : "s"} de agenda
                     </strong>
                     <span>Revisa los horarios y períodos de vacaciones.</span>
+                    <details className="conflict-details">
+                      <summary>Ver conflictos</summary>
+                      <ul className="conflict-list">
+                        {scheduleConflicts.map((conflict) => {
+                          const firstEntry = entriesById.get(conflict.firstEntryId)
+                          const secondEntry = entriesById.get(conflict.secondEntryId)
+                          return (
+                            <li key={`${conflict.date}:${conflict.firstEntryId}:${conflict.secondEntryId}`}>
+                              <a
+                                href="#calendar"
+                                onClick={() => {
+                                  setActiveDate(new Date(`${conflict.date}T12:00:00`))
+                                  setView("week")
+                                }}
+                              >
+                                <time dateTime={conflict.date}>
+                                  {format(new Date(`${conflict.date}T12:00:00`), "EEE d MMM", { locale: es })}
+                                </time>
+                                <span>
+                                  {firstEntry ? getEntryLabel(firstEntry) : "Actividad"} ·{" "}
+                                  {secondEntry ? getEntryLabel(secondEntry) : "Actividad"}
+                                </span>
+                              </a>
+                            </li>
+                          )
+                        })}
+                      </ul>
+                    </details>
                   </div>
                 )}
               </section>

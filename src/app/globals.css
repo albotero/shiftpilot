@@ -1426,6 +1426,41 @@ a {
   font-size: 8px;
 }
 
+.conflict-details summary {
+  color: #8f4938;
+  cursor: pointer;
+  font-size: 8px;
+  font-weight: 650;
+}
+
+.conflict-list {
+  display: grid;
+  gap: 5px;
+  max-height: 150px;
+  overflow-y: auto;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.conflict-list a {
+  display: grid;
+  gap: 2px;
+  padding: 4px 0;
+  color: #7e4c40;
+  font-size: 8px;
+}
+
+.conflict-list a:hover span {
+  text-decoration: underline;
+}
+
+.conflict-list time {
+  color: #a8786d;
+  font-size: 7px;
+  text-transform: capitalize;
+}
+
 .debt-card {
   overflow: hidden;
   padding: 14px;

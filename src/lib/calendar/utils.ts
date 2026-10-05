@@ -9,6 +9,7 @@ import {
   startOfWeek,
 } from "date-fns"
 import { es } from "date-fns/locale"
+import { somaShiftWindows } from "./availability"
 import type { CalendarEntry, CalendarEntryKind, CalendarView, ShiftPeriod } from "./types"
 
 export function toDateKey(date: Date) {
@@ -28,6 +29,20 @@ export function getVisibleDays(date: Date, view: CalendarView) {
   })
 }
 
+function timeToMinutes(time: string) {
+  const [hours, minutes] = time.split(":").map(Number)
+  return hours * 60 + minutes
+}
+
+export function getCalendarEntryStartMinute(entry: CalendarEntry) {
+  if (entry.kind === "SOMA" && entry.period) {
+    const period = entry.period === "AM + PM" ? "AM" : entry.period
+    const startTime = somaShiftWindows[period]?.startTime
+    if (startTime) return timeToMinutes(startTime)
+  }
+  return entry.startTime ? timeToMinutes(entry.startTime) : 0
+}
+
 export function getEntriesForDate(entries: CalendarEntry[], date: Date, includeFreeSomaFallback = true) {
   const key = toDateKey(date)
   const matching = entries.filter((entry) => {
@@ -35,7 +50,9 @@ export function getEntriesForDate(entries: CalendarEntry[], date: Date, includeF
     return entry.date <= key && endDate >= key
   })
   const scheduled = matching.filter((entry) => !(entry.kind === "SOMA" && entry.status === "LIBRE"))
-  if (!includeFreeSomaFallback) return scheduled
+  if (!includeFreeSomaFallback) {
+    return scheduled.sort((left, right) => getCalendarEntryStartMinute(left) - getCalendarEntryStartMinute(right))
+  }
 
   const occupiedPeriods = new Set<"AM" | "PM">()
   for (const entry of scheduled) {
@@ -73,15 +90,8 @@ export function getEntriesForDate(entries: CalendarEntry[], date: Date, includeF
     isFallback: true,
   }))
   return [...scheduled, ...fallbackEntries].sort(
-    (left, right) => getEntryHalfDayOrder(left) - getEntryHalfDayOrder(right),
+    (left, right) => getCalendarEntryStartMinute(left) - getCalendarEntryStartMinute(right),
   )
-}
-
-function getEntryHalfDayOrder(entry: CalendarEntry) {
-  if (entry.kind === "SOMA") return entry.period === "NOCHE" ? 2 : entry.period === "PM" ? 1 : 0
-  if (!entry.startTime) return 0
-  const startHour = Number(entry.startTime.slice(0, 2))
-  return startHour >= 12 ? 1 : 0
 }
 
 export function getEntryLabel(entry: CalendarEntry) {

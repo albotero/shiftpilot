@@ -7,6 +7,7 @@ import { es } from "date-fns/locale"
 import { getColombianHoliday } from "@/lib/calendar/colombian-holidays"
 import {
   formatLongDate,
+  getCalendarEntryStartMinute,
   getEntriesForDate,
   getEntryLabel,
   getEntryTone,
@@ -57,7 +58,13 @@ export function CalendarPanel({
       const holiday = getColombianHoliday(date)
       return holiday ? [{ date, holiday: holiday.name }] : []
     }),
-  ].sort((left, right) => left.date.localeCompare(right.date))
+  ].sort((left, right) => {
+    const dateOrder = left.date.localeCompare(right.date)
+    if (dateOrder !== 0) return dateOrder
+    const leftTime = "entry" in left ? getCalendarEntryStartMinute(left.entry) : 0
+    const rightTime = "entry" in right ? getCalendarEntryStartMinute(right.entry) : 0
+    return leftTime - rightTime
+  })
 
   function move(direction: -1 | 1) {
     const nextDate =
