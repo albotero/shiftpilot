@@ -592,12 +592,28 @@ a {
 }
 
 .calendar-title-group h2,
+.calendar-month-picker,
 .rail-heading h2 {
   margin: 0;
   color: #24332f;
   font-size: 15px;
   font-weight: 650;
   text-transform: capitalize;
+}
+
+.calendar-month-picker {
+  width: 150px;
+  height: 23px;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.calendar-month-picker:focus-visible {
+  border-radius: 3px;
+  outline: 2px solid #9cdb53;
+  outline-offset: 2px;
 }
 
 .calendar-actions {
@@ -1966,7 +1982,8 @@ a {
     gap: 7px;
   }
 
-  .calendar-title-group h2 {
+  .calendar-title-group h2,
+  .calendar-month-picker {
     font-size: 13px;
   }
 
@@ -2206,6 +2223,10 @@ a {
 
   .calendar-title-icon {
     display: none;
+  }
+
+  .calendar-month-picker {
+    width: 128px;
   }
 
   .calendar-filters {

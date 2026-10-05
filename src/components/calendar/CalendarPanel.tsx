@@ -7,7 +7,6 @@ import { es } from "date-fns/locale"
 import { getColombianHoliday } from "@/lib/calendar/colombian-holidays"
 import {
   formatLongDate,
-  formatMonth,
   getEntriesForDate,
   getEntryLabel,
   getEntryTone,
@@ -85,7 +84,16 @@ export function CalendarPanel({
           </div>
           <div>
             <p className="eyebrow">Tu calendario</p>
-            <h2>{formatMonth(activeDate)}</h2>
+            <input
+              className="calendar-month-picker"
+              type="month"
+              aria-label="Seleccionar mes y año"
+              value={format(activeDate, "yyyy-MM")}
+              onChange={(event) => {
+                const [year, month] = event.target.value.split("-").map(Number)
+                if (year && month) onDateChange(new Date(year, month - 1, 1, 12))
+              }}
+            />
           </div>
         </div>
         <div className="calendar-actions">
