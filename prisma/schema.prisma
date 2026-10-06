@@ -278,6 +278,20 @@ model SocialSecurityPeriod {
   discounts      Decimal  @default(0) @db.Decimal(18, 3)
   netAmount      Decimal  @default(0) @db.Decimal(18, 3)
   ibcAmount      Decimal  @default(0) @db.Decimal(18, 3)
+  minimumWageCop           Int?
+  minimumWageSourceYear    Int?
+  minimumWageSourceUrl     String?
+  minimumWageStale         Boolean?
+  pensionEnabled           Boolean?
+  arlEnabled               Boolean?
+  arlRiskClass             String?
+  compensationFundEnabled  Boolean?
+  ibcRatePpm               Int?
+  healthRatePpm            Int?
+  pensionRatePpm           Int?
+  arlRatePpm               Int?
+  fundRatePpm              Int?
+  solidarityRatePpm        Int?
   healthAmountTenths  Int @default(0)
   pensionAmountTenths Int @default(0)
   arlAmountTenths     Int @default(0)

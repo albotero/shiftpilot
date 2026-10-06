@@ -18,12 +18,35 @@ function validMonth(month: string | null): month is string {
   return year >= 1900 && year <= 9998 && monthNumber >= 1 && monthNumber <= 12
 }
 
+async function getMinimumWageForMonth(month: string) {
+  const year = Number(month.slice(0, 4))
+  const savedPeriod = await prisma.socialSecurityPeriod.findUnique({
+    where: { month: new Date(`${month}-01T00:00:00.000Z`) },
+    select: {
+      minimumWageCop: true,
+      minimumWageSourceYear: true,
+      minimumWageSourceUrl: true,
+      minimumWageStale: true,
+    },
+  })
+  if (typeof savedPeriod?.minimumWageCop === "number" && typeof savedPeriod.minimumWageSourceUrl === "string") {
+    return {
+      year,
+      sourceYear: savedPeriod.minimumWageSourceYear ?? year,
+      amountCop: savedPeriod.minimumWageCop,
+      sourceUrl: savedPeriod.minimumWageSourceUrl,
+      stale: savedPeriod.minimumWageStale ?? false,
+    }
+  }
+  return getMinimumWageForYear(prisma, year)
+}
+
 export async function GET(request: Request) {
   const month = new URL(request.url).searchParams.get("month")
   if (!validMonth(month)) return Response.json({ error: "Mes inválido" }, { status: 400 })
 
   try {
-    const minimumWage = await getMinimumWageForYear(prisma, Number(month.slice(0, 4)))
+    const minimumWage = await getMinimumWageForMonth(month)
     const result = await prisma.$transaction((transaction) =>
       recalculateSocialSecurityPeriod(transaction, month, minimumWage),
     )
@@ -47,15 +70,9 @@ export async function PATCH(request: Request) {
   }
 
   try {
-    const minimumWage = await getMinimumWageForYear(prisma, Number(parsed.data.month.slice(0, 4)))
+    const minimumWage = await getMinimumWageForMonth(parsed.data.month)
     const result = await prisma.$transaction(async (transaction) => {
-      const key = "socialSecurity.configuration"
-      await transaction.appSetting.upsert({
-        where: { key },
-        create: { key, value: parsed.data.configuration },
-        update: { value: parsed.data.configuration },
-      })
-      return recalculateSocialSecurityPeriod(transaction, parsed.data.month, minimumWage)
+      return recalculateSocialSecurityPeriod(transaction, parsed.data.month, minimumWage, parsed.data.configuration)
     })
     return Response.json(result)
   } catch {

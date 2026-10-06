@@ -5,7 +5,7 @@ const prismaMock = vi.hoisted(() => ({
     $transaction: vi.fn(),
     invoice: { findMany: vi.fn() },
     appSetting: { findMany: vi.fn(), upsert: vi.fn() },
-    socialSecurityPeriod: { upsert: vi.fn() },
+    socialSecurityPeriod: { findUnique: vi.fn(), upsert: vi.fn() },
   },
 }))
 
@@ -46,6 +46,7 @@ beforeEach(() => {
     { grossAmount: 47_445.123, discountAmount: 16_824.665, shiftDiscountAmount: 0, netAmount: 30_620.458 },
   ])
   prismaMock.prisma.appSetting.findMany.mockResolvedValue(settings)
+  prismaMock.prisma.socialSecurityPeriod.findUnique.mockResolvedValue(null)
   prismaMock.prisma.socialSecurityPeriod.upsert.mockImplementation(async ({ where, create, update }) => ({
     id: "period",
     ...create,
@@ -116,6 +117,30 @@ describe("social-security routes", () => {
     })
   })
 
+  it("uses the saved monthly SMMLV snapshot instead of resolving a newer annual value", async () => {
+    const savedPeriod = {
+      minimumWageCop: 1_750_905,
+      minimumWageSourceYear: 2026,
+      minimumWageSourceUrl: "https://www.mintrabajo.gov.co/saved-2026",
+      minimumWageStale: false,
+    }
+    prismaMock.prisma.socialSecurityPeriod.findUnique
+      .mockResolvedValueOnce(savedPeriod)
+      .mockResolvedValueOnce(savedPeriod)
+
+    const response = await GET(new Request("http://localhost/api/social-security?month=2026-12"))
+    const result = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(result.minimumWage).toEqual({
+      year: 2026,
+      sourceYear: 2026,
+      amountCop: 1_750_905,
+      sourceUrl: "https://www.mintrabajo.gov.co/saved-2026",
+      stale: false,
+    })
+  })
+
   it("saves contribution options and recalculates the selected month", async () => {
     const response = await PATCH(
       jsonRequest({
@@ -130,29 +155,17 @@ describe("social-security routes", () => {
     )
 
     expect(response.status).toBe(200)
-    expect(prismaMock.prisma.appSetting.upsert).toHaveBeenCalledTimes(1)
-    expect(prismaMock.prisma.appSetting.upsert).toHaveBeenCalledWith({
-      where: { key: "socialSecurity.configuration" },
-      create: {
-        key: "socialSecurity.configuration",
-        value: {
-          pensionEnabled: false,
-          arlEnabled: true,
-          arlRiskClass: "V",
-          compensationFundEnabled: true,
-        },
-      },
-      update: {
-        value: {
-          pensionEnabled: false,
-          arlEnabled: true,
-          arlRiskClass: "V",
-          compensationFundEnabled: true,
-        },
-      },
-    })
+    expect(prismaMock.prisma.appSetting.upsert).not.toHaveBeenCalled()
     expect(prismaMock.prisma.socialSecurityPeriod.upsert).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { month: new Date("2026-10-01T00:00:00.000Z") } }),
+      expect.objectContaining({
+        where: { month: new Date("2026-10-01T00:00:00.000Z") },
+        update: expect.objectContaining({
+          pensionEnabled: false,
+          arlEnabled: true,
+          arlRiskClass: "V",
+          compensationFundEnabled: true,
+        }),
+      }),
     )
   })
 

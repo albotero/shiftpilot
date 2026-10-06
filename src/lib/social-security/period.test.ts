@@ -98,6 +98,7 @@ describe("monthly social security period", () => {
           .mockResolvedValue([{ key: "socialSecurity.configuration", value: DEFAULT_SOCIAL_SECURITY_CONFIGURATION }]),
       },
       socialSecurityPeriod: {
+        findUnique: vi.fn().mockResolvedValue(null),
         upsert: vi.fn(async ({ where, create, update }) => ({
           id: "period-september",
           ...create,
@@ -120,6 +121,22 @@ describe("monthly social security period", () => {
       select: { grossAmount: true, discountAmount: true, shiftDiscountAmount: true, netAmount: true },
     })
     expect(database.socialSecurityPeriod.upsert).toHaveBeenCalledTimes(2)
+    expect(database.socialSecurityPeriod.upsert).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        create: expect.objectContaining({
+          minimumWageCop: minimumWage.amountCop,
+          minimumWageSourceYear: minimumWage.sourceYear,
+          minimumWageSourceUrl: minimumWage.sourceUrl,
+          pensionEnabled: true,
+          arlRiskClass: "III",
+          compensationFundEnabled: false,
+          healthRatePpm: 125_000,
+          pensionRatePpm: 160_000,
+          solidarityRatePpm: 0,
+        }),
+      }),
+    )
     expect(first.rates.ibcRatePpm).toBe(400_000)
     expect(first.period).toEqual(second.period)
     expect(first.period).toMatchObject({
@@ -128,5 +145,87 @@ describe("monthly social security period", () => {
       netAmount: 900,
       ibcAmount: 1_750.905,
     })
+  })
+
+  it("keeps a saved month's minimum wage and contribution configuration when annual settings change", async () => {
+    const savedConfiguration = {
+      pensionEnabled: true,
+      arlEnabled: true,
+      arlRiskClass: "III" as const,
+      compensationFundEnabled: false,
+    }
+    const database = {
+      invoice: {
+        findMany: vi
+          .fn()
+          .mockResolvedValue([{ grossAmount: 800, discountAmount: 0, shiftDiscountAmount: 0, netAmount: 800 }]),
+      },
+      appSetting: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            key: "socialSecurity.configuration",
+            value: {
+              pensionEnabled: false,
+              arlEnabled: true,
+              arlRiskClass: "V",
+              compensationFundEnabled: true,
+            },
+          },
+        ]),
+      },
+      socialSecurityPeriod: {
+        findUnique: vi.fn().mockResolvedValue({
+          minimumWageCop: 1_750_905,
+          minimumWageSourceYear: 2026,
+          minimumWageSourceUrl: "https://www.mintrabajo.gov.co/official-2026",
+          minimumWageStale: false,
+          ibcRatePpm: 400_000,
+          healthRatePpm: 130_000,
+          pensionRatePpm: 150_000,
+          arlRatePpm: 24_360,
+          fundRatePpm: 0,
+          ...savedConfiguration,
+        }),
+        upsert: vi.fn(async ({ where, create, update }) => ({
+          id: "period-december",
+          ...create,
+          ...update,
+          month: where.month,
+        })),
+      },
+    } as unknown as SocialSecurityPeriodDatabase
+    const nextYearWage: MinimumWageSnapshot = {
+      year: 2027,
+      sourceYear: 2027,
+      amountCop: 2_000_000,
+      sourceUrl: "https://www.mintrabajo.gov.co/official-2027",
+      stale: false,
+    }
+
+    const result = await recalculateSocialSecurityPeriod(database, "2026-12", nextYearWage)
+
+    expect(result.minimumWage).toEqual({
+      year: 2026,
+      sourceYear: 2026,
+      amountCop: 1_750_905,
+      sourceUrl: "https://www.mintrabajo.gov.co/official-2026",
+      stale: false,
+    })
+    expect(result.configuration).toEqual(savedConfiguration)
+    expect(result.period.ibcAmount).toBe(1_750.905)
+    expect(result.rates.healthRatePpm).toBe(130_000)
+    expect(result.rates.pensionRatePpm).toBe(150_000)
+    expect(result.rates.arlRatePpm).toBe(24_360)
+    expect(result.rates.fundRatePpm).toBe(0)
+    expect(database.socialSecurityPeriod.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({
+          minimumWageCop: 1_750_905,
+          pensionEnabled: true,
+          arlRiskClass: "III",
+          compensationFundEnabled: false,
+        }),
+      }),
+    )
   })
 })

@@ -160,8 +160,9 @@ export function SocialSecurityManager({ month, refreshToken }: { month: string; 
           <div className="social-security-contributions" aria-label="Aportes calculados">
             {contributions.map(({ label, rate, amount }) => (
               <div className="social-security-contribution" key={label}>
-                <span>{label}</span>
-                <span>{(Number(rate) / 10_000).toLocaleString("es-CO", { maximumFractionDigits: 3 })}%</span>
+                <span>
+                  {label} {(Number(rate) / 10_000).toLocaleString("es-CO", { maximumFractionDigits: 3 })}%
+                </span>
                 <strong>{formatAmount(Number(amount) / 10)}</strong>
               </div>
             ))}

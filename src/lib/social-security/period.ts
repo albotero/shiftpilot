@@ -5,7 +5,9 @@ import {
   DEFAULT_SOCIAL_SECURITY_CONFIGURATION,
   getCalculatedSocialSecurityRates,
   getSocialSecurityConfiguration,
+  type ArlRiskClass,
   type SocialSecurityConfiguration,
+  type SocialSecurityRates,
 } from "./calculations"
 import type { MinimumWageSnapshot } from "./minimum-wage"
 
@@ -33,13 +35,15 @@ export function calculateSocialSecurityPeriod(
   configuration: SocialSecurityConfiguration = DEFAULT_SOCIAL_SECURITY_CONFIGURATION,
   minimumIbcAmount = 0,
   minimumWageCop = 0,
+  ratesOverride: Partial<SocialSecurityRates> = {},
 ) {
   const grossAmount = addMoney(...invoices.map((invoice) => invoice.grossAmount))
   const discounts = addMoney(...invoices.flatMap((invoice) => [invoice.discountAmount, invoice.shiftDiscountAmount]))
   const netAmount = addMoney(...invoices.map((invoice) => invoice.netAmount))
   const ibcPercentage = roundMoneyAmount(netAmount * 0.4)
   const ibcAmount = maxMoney(ibcPercentage, minimumIbcAmount)
-  const rates = getCalculatedSocialSecurityRates(configuration, ibcAmount, minimumWageCop)
+  const calculatedRates = getCalculatedSocialSecurityRates(configuration, ibcAmount, minimumWageCop)
+  const rates = { ...calculatedRates, ...ratesOverride, solidarityRatePpm: calculatedRates.solidarityRatePpm }
   const contributions = calculateSocialSecurity(ibcAmount, rates)
 
   return {
@@ -62,17 +66,54 @@ export async function recalculateSocialSecurityPeriod(
   database: SocialSecurityPeriodDatabase,
   month: string,
   minimumWage: MinimumWageSnapshot,
+  configurationOverride?: SocialSecurityConfiguration,
 ) {
   const monthStart = getMonthStart(month)
   const nextMonth = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1))
-  const [invoices, settingRecords] = await Promise.all([
+  const [invoices, settingRecords, existingPeriod] = await Promise.all([
     database.invoice.findMany({
       where: { serviceDate: { gte: monthStart, lt: nextMonth } },
       select: { grossAmount: true, discountAmount: true, shiftDiscountAmount: true, netAmount: true },
     }),
     database.appSetting.findMany({ where: { key: { startsWith: "socialSecurity." } } }),
+    database.socialSecurityPeriod.findUnique({ where: { month: monthStart } }),
   ])
-  const configuration = getSocialSecurityConfiguration(settingRecords)
+  const savedRiskClass = existingPeriod?.arlRiskClass
+  const hasSavedConfiguration =
+    typeof existingPeriod?.pensionEnabled === "boolean" &&
+    typeof existingPeriod.arlEnabled === "boolean" &&
+    typeof savedRiskClass === "string" &&
+    ["I", "II", "III", "IV", "V"].includes(savedRiskClass) &&
+    typeof existingPeriod.compensationFundEnabled === "boolean"
+  const configuration =
+    configurationOverride ??
+    (hasSavedConfiguration
+      ? {
+          pensionEnabled: existingPeriod.pensionEnabled as boolean,
+          arlEnabled: existingPeriod.arlEnabled as boolean,
+          arlRiskClass: savedRiskClass as ArlRiskClass,
+          compensationFundEnabled: existingPeriod.compensationFundEnabled as boolean,
+        }
+      : getSocialSecurityConfiguration(settingRecords))
+  const savedMinimumWage = existingPeriod?.minimumWageCop
+  const periodMinimumWage: MinimumWageSnapshot =
+    typeof savedMinimumWage === "number" && existingPeriod
+      ? {
+          year: monthStart.getUTCFullYear(),
+          sourceYear: existingPeriod.minimumWageSourceYear ?? monthStart.getUTCFullYear(),
+          amountCop: savedMinimumWage,
+          sourceUrl: existingPeriod.minimumWageSourceUrl ?? minimumWage.sourceUrl,
+          stale: existingPeriod.minimumWageStale ?? false,
+        }
+      : minimumWage
+  const savedRates: Partial<SocialSecurityRates> = {}
+  if (!configurationOverride && existingPeriod) {
+    if (typeof existingPeriod.ibcRatePpm === "number") savedRates.ibcRatePpm = existingPeriod.ibcRatePpm
+    if (typeof existingPeriod.healthRatePpm === "number") savedRates.healthRatePpm = existingPeriod.healthRatePpm
+    if (typeof existingPeriod.pensionRatePpm === "number") savedRates.pensionRatePpm = existingPeriod.pensionRatePpm
+    if (typeof existingPeriod.arlRatePpm === "number") savedRates.arlRatePpm = existingPeriod.arlRatePpm
+    if (typeof existingPeriod.fundRatePpm === "number") savedRates.fundRatePpm = existingPeriod.fundRatePpm
+  }
   const calculated = calculateSocialSecurityPeriod(
     invoices.map((invoice) => ({
       grossAmount: Number(invoice.grossAmount),
@@ -81,21 +122,39 @@ export async function recalculateSocialSecurityPeriod(
       netAmount: Number(invoice.netAmount),
     })),
     configuration,
-    roundMoneyAmount(minimumWage.amountCop / 1000),
-    minimumWage.amountCop,
+    roundMoneyAmount(periodMinimumWage.amountCop / 1000),
+    periodMinimumWage.amountCop,
+    savedRates,
   )
   const { rates, configuration: savedConfiguration, ...amounts } = calculated
+  const snapshot = {
+    ...amounts,
+    minimumWageCop: periodMinimumWage.amountCop,
+    minimumWageSourceYear: periodMinimumWage.sourceYear,
+    minimumWageSourceUrl: periodMinimumWage.sourceUrl,
+    minimumWageStale: periodMinimumWage.stale,
+    pensionEnabled: savedConfiguration.pensionEnabled,
+    arlEnabled: savedConfiguration.arlEnabled,
+    arlRiskClass: savedConfiguration.arlRiskClass,
+    compensationFundEnabled: savedConfiguration.compensationFundEnabled,
+    ibcRatePpm: rates.ibcRatePpm,
+    healthRatePpm: rates.healthRatePpm,
+    pensionRatePpm: rates.pensionRatePpm,
+    arlRatePpm: rates.arlRatePpm,
+    fundRatePpm: rates.fundRatePpm,
+    solidarityRatePpm: rates.solidarityRatePpm,
+  }
   const record = await database.socialSecurityPeriod.upsert({
     where: { month: monthStart },
-    create: { month: monthStart, ...amounts },
-    update: amounts,
+    create: { month: monthStart, ...snapshot },
+    update: snapshot,
   })
 
   return {
     month,
     rates,
     configuration: savedConfiguration,
-    minimumWage,
+    minimumWage: periodMinimumWage,
     period: {
       grossAmount: Number(record.grossAmount),
       discounts: Number(record.discounts),

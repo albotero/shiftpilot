@@ -1,0 +1,15 @@
+ALTER TABLE "SocialSecurityPeriod"
+ADD COLUMN "minimumWageCop" INTEGER,
+ADD COLUMN "minimumWageSourceYear" INTEGER,
+ADD COLUMN "minimumWageSourceUrl" TEXT,
+ADD COLUMN "minimumWageStale" BOOLEAN,
+ADD COLUMN "pensionEnabled" BOOLEAN,
+ADD COLUMN "arlEnabled" BOOLEAN,
+ADD COLUMN "arlRiskClass" TEXT,
+ADD COLUMN "compensationFundEnabled" BOOLEAN,
+ADD COLUMN "ibcRatePpm" INTEGER,
+ADD COLUMN "healthRatePpm" INTEGER,
+ADD COLUMN "pensionRatePpm" INTEGER,
+ADD COLUMN "arlRatePpm" INTEGER,
+ADD COLUMN "fundRatePpm" INTEGER,
+ADD COLUMN "solidarityRatePpm" INTEGER;

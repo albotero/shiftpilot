@@ -6,7 +6,7 @@ const prismaMock = vi.hoisted(() => ({
     invoice: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     work: { findUnique: vi.fn() },
     appSetting: { findMany: vi.fn() },
-    socialSecurityPeriod: { upsert: vi.fn() },
+    socialSecurityPeriod: { findUnique: vi.fn(), upsert: vi.fn() },
   },
 }))
 
@@ -48,6 +48,7 @@ beforeEach(() => {
   )
   prismaMock.prisma.invoice.findMany.mockResolvedValue([])
   prismaMock.prisma.appSetting.findMany.mockResolvedValue(settings)
+  prismaMock.prisma.socialSecurityPeriod.findUnique.mockResolvedValue(null)
   prismaMock.prisma.socialSecurityPeriod.upsert.mockResolvedValue({})
   prismaMock.prisma.work.findUnique.mockImplementation(async ({ where }: { where: { name: string } }) => ({
     id: `${where.name.toLowerCase()}-work`,
