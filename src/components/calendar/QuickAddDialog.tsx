@@ -1,6 +1,7 @@
 "use client"
 
 import { useEffect, useState, type FormEvent } from "react"
+import Link from "next/link"
 import { RotateCcw, Trash2, X } from "lucide-react"
 import { calendarEntrySchema } from "@/lib/calendar/schema"
 import { toDateKey } from "@/lib/calendar/utils"
@@ -360,7 +361,7 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
                 ))}
               {isCoverageStatus && !loadingReplacementPeople && replacementPeople.every((person) => !person.active) && (
                 <p className="replacement-people-hint">
-                  No hay anestesiólogos activos. <a href="#settings">Agrégalos en Configuración.</a>
+                  No hay anestesiólogos activos. <Link href="/settings">Agrégalos en Configuración.</Link>
                 </p>
               )}
             </>

@@ -136,13 +136,15 @@ model Invoice {
   type                  InvoiceType
   serviceDate           DateTime     @db.Date
   invoiceDate           DateTime?    @db.Date
+  invoiceNumber         String?      @db.VarChar(64)
   expectedPaymentDate   DateTime?    @db.Date
-  grossAmount           Int
-  discountAmount        Int          @default(0)
-  shiftDiscountAmount   Int          @default(0)
-  netAmount             Int
+  pdfTotalAmount        Decimal?     @db.Decimal(18, 3)
+  grossAmount           Decimal      @db.Decimal(18, 3)
+  discountAmount        Decimal      @default(0) @db.Decimal(18, 3)
+  shiftDiscountAmount   Decimal      @default(0) @db.Decimal(18, 3)
+  netAmount             Decimal      @db.Decimal(18, 3)
   privateShiftCount     Int          @default(0)
-  privateShiftAmount    Int          @default(0)
+  privateShiftAmount    Decimal      @default(0) @db.Decimal(18, 3)
   status                InvoiceStatus @default(PENDIENTE)
   paidAt                DateTime?    @db.Date
   notes                 String?
@@ -160,8 +162,9 @@ model InvoiceItem {
   invoice     Invoice  @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
   description String
   quantity    Decimal  @default(1) @db.Decimal(10, 2)
-  unitAmount  Int
-  grossAmount Int
+  unitAmount  Decimal  @db.Decimal(18, 3)
+  discountAmount Decimal @default(0) @db.Decimal(18, 3)
+  grossAmount Decimal  @db.Decimal(18, 3)
   createdAt   DateTime @default(now())
 
   @@index([invoiceId])
@@ -170,10 +173,10 @@ model InvoiceItem {
 model SocialSecurityPeriod {
   id             String   @id @default(cuid())
   month          DateTime @unique @db.Date
-  grossAmount    Int      @default(0)
-  discounts      Int      @default(0)
-  netAmount      Int      @default(0)
-  ibcAmount      Int      @default(0)
+  grossAmount    Decimal  @default(0) @db.Decimal(18, 3)
+  discounts      Decimal  @default(0) @db.Decimal(18, 3)
+  netAmount      Decimal  @default(0) @db.Decimal(18, 3)
+  ibcAmount      Decimal  @default(0) @db.Decimal(18, 3)
   healthAmountTenths  Int @default(0)
   pensionAmountTenths Int @default(0)
   arlAmountTenths     Int @default(0)
@@ -188,7 +191,7 @@ model Debt {
   name                  String        @unique @default("Compra de acciones")
   shareCount            Int
   sharePriceCop         Int
-  originalAmount        Int
+  originalAmount        Decimal       @db.Decimal(18, 3)
   contractualRatePpm    Int           @default(80000)
   lateFeeRatePpm        Int           @default(0)
   termMonths            Int
@@ -205,12 +208,12 @@ model DebtSchedule {
   debt             Debt                     @relation(fields: [debtId], references: [id], onDelete: Cascade)
   installment      Int
   dueDate          DateTime                 @db.Date
-  previousBalance  Int
-  monthlyInterest  Int
-  paymentAmount    Int
-  principalAmount  Int
-  interestAmount   Int
-  remainingBalance Int
+  previousBalance  Decimal                  @db.Decimal(18, 3)
+  monthlyInterest  Decimal                  @db.Decimal(18, 3)
+  paymentAmount    Decimal                  @db.Decimal(18, 3)
+  principalAmount  Decimal                  @db.Decimal(18, 3)
+  interestAmount   Decimal                  @db.Decimal(18, 3)
+  remainingBalance Decimal                  @db.Decimal(18, 3)
   allocations      DebtPaymentAllocation[]
   createdAt        DateTime                 @default(now())
 
@@ -223,8 +226,8 @@ model DebtPayment {
   debtId         String
   debt           Debt                     @relation(fields: [debtId], references: [id], onDelete: Restrict)
   paidAt         DateTime                 @db.Date
-  amount         Int
-  parkingAmount  Int                      @default(0)
+  amount         Decimal                  @db.Decimal(18, 3)
+  parkingAmount  Decimal                  @default(0) @db.Decimal(18, 3)
   notes          String?
   allocations    DebtPaymentAllocation[]
   createdAt      DateTime                 @default(now())
@@ -238,8 +241,8 @@ model DebtPaymentAllocation {
   payment            DebtPayment  @relation(fields: [paymentId], references: [id], onDelete: Cascade)
   scheduleId         String
   schedule           DebtSchedule @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
-  principalAmount    Int          @default(0)
-  interestAmount     Int          @default(0)
+  principalAmount    Decimal      @default(0) @db.Decimal(18, 3)
+  interestAmount     Decimal      @default(0) @db.Decimal(18, 3)
 
   @@unique([paymentId, scheduleId])
 }
@@ -247,7 +250,7 @@ model DebtPaymentAllocation {
 model ParkingRate {
   id        String   @id @default(cuid())
   year      Int      @unique
-  amount    Int      @default(0)
+  amount    Decimal  @default(0) @db.Decimal(18, 3)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

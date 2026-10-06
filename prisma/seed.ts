@@ -99,12 +99,12 @@ async function main() {
         return (
           record.installment === index + 1 &&
           record.dueDate.toISOString().slice(0, 7) === month &&
-          record.previousBalance === previousBalance &&
-          record.monthlyInterest === monthlyInterest &&
-          record.paymentAmount === paymentAmount &&
-          record.interestAmount === interestAmount &&
-          record.principalAmount === principalAmount &&
-          record.remainingBalance === remainingBalance
+          Number(record.previousBalance) === previousBalance &&
+          Number(record.monthlyInterest) === monthlyInterest &&
+          Number(record.paymentAmount) === paymentAmount &&
+          Number(record.interestAmount) === interestAmount &&
+          Number(record.principalAmount) === principalAmount &&
+          Number(record.remainingBalance) === remainingBalance
         )
       })
 

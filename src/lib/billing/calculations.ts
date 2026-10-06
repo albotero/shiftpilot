@@ -1,4 +1,4 @@
-import { assertMoneyAmount, percentageOf } from "@/lib/money/integer"
+import { addMoney, assertMoneyAmount, percentageOf, subtractMoney } from "@/lib/money/integer"
 
 export const DEFAULT_BILLING_SETTINGS = {
   posDiscountRatePpm: 120_000,
@@ -26,7 +26,7 @@ function getNetAmount(grossAmount: number, discountAmount: number, shiftDiscount
   assertMoneyAmount(grossAmount, "grossAmount")
   assertMoneyAmount(discountAmount, "discountAmount")
   assertMoneyAmount(shiftDiscountAmount, "shiftDiscountAmount")
-  const netAmount = grossAmount - discountAmount - shiftDiscountAmount
+  const netAmount = subtractMoney(grossAmount, discountAmount, shiftDiscountAmount)
   if (netAmount < 0) throw new RangeError("Invoice discounts cannot exceed the gross amount")
   return netAmount
 }
@@ -79,7 +79,7 @@ export function calculateParticularInvoice(
     discountAmount,
     shiftDiscountAmount: 0,
     privateShiftAmount,
-    netAmount: netAmount + privateShiftAmount,
+    netAmount: addMoney(netAmount, privateShiftAmount),
   }
 }
 

@@ -75,9 +75,82 @@ describe("invoice routes", () => {
         data: expect.objectContaining({
           workId: "soma-work",
           expectedPaymentDate: new Date("2027-01-01T00:00:00.000Z"),
-          items: { create: [{ description: "Servicio", quantity: 1, unitAmount: 1000, grossAmount: 1000 }] },
+          items: {
+            create: [{ description: "Servicio", quantity: 1, unitAmount: 1000, discountAmount: 0, grossAmount: 1000 }],
+          },
         }),
         include: { items: true },
+      }),
+    )
+  })
+
+  it("persists imported SOMA POS totals without recalculating PDF discounts", async () => {
+    prismaMock.prisma.invoice.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
+      id: "invoice-imported",
+      ...data,
+      invoiceDate: new Date("2026-09-30T00:00:00.000Z"),
+      expectedPaymentDate: new Date("2026-12-29T00:00:00.000Z"),
+      items: [
+        {
+          id: "item-imported",
+          description: "SERVICIOS ANESTESIOLOGIA POS",
+          quantity: 1,
+          unitAmount: 47445.123,
+          discountAmount: 16824.665,
+          grossAmount: 47445.123,
+        },
+      ],
+    }))
+
+    const response = await POST(
+      jsonRequest("POST", {
+        type: "SOMA_POS",
+        serviceDate: "2026-09-30",
+        invoiceDate: "2026-09-30",
+        invoiceNumber: "SF 174",
+        expectedPaymentDate: "2026-12-29",
+        pdfTotalAmount: 30620.458,
+        status: "FACTURADA",
+        items: [
+          {
+            description: "SERVICIOS ANESTESIOLOGIA POS",
+            quantity: 1,
+            unitAmount: 47445.123,
+            discountAmount: 16824.665,
+          },
+        ],
+      }),
+    )
+    const invoice = await response.json()
+
+    expect(response.status).toBe(201)
+    expect(invoice).toMatchObject({
+      invoiceNumber: "SF 174",
+      expectedPaymentDate: "2026-12-29",
+      pdfTotalAmount: 30620.458,
+      grossAmount: 47445.123,
+      discountAmount: 16824.665,
+      shiftDiscountAmount: 0,
+      netAmount: 30620.458,
+      items: [{ unitAmount: 47445.123, discountAmount: 16824.665, grossAmount: 47445.123 }],
+    })
+    expect(prismaMock.prisma.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          invoiceNumber: "SF 174",
+          expectedPaymentDate: new Date("2026-12-29T00:00:00.000Z"),
+          pdfTotalAmount: 30620.458,
+          items: {
+            create: [
+              expect.objectContaining({
+                description: "SERVICIOS ANESTESIOLOGIA POS",
+                unitAmount: 47445.123,
+                discountAmount: 16824.665,
+                grossAmount: 47445.123,
+              }),
+            ],
+          },
+        }),
       }),
     )
   })

@@ -1,14 +1,17 @@
 "use client"
 
-import { useEffect, useState, type FormEvent } from "react"
-import { FilePlus2, Pencil, Plus, Trash2, X } from "lucide-react"
+import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react"
+import { FilePlus2, FileUp, Pencil, Plus, Trash2, X } from "lucide-react"
 import { DEFAULT_BILLING_SETTINGS, type BillingSettings } from "@/lib/billing/calculations"
+import { addMoney, roundMoneyAmount, subtractMoney } from "@/lib/money/integer"
+import { extractInvoiceTextFromPdf } from "@/lib/billing/pdf-reader"
 import {
   calculateInvoiceAmounts,
   getExpectedPaymentDate,
   invoiceMutationSchema,
   type InvoiceMutation,
 } from "@/lib/billing/invoice-service"
+import { parseInvoicePdfText } from "@/lib/billing/pdf-import"
 
 type InvoiceType = InvoiceMutation["type"]
 type InvoiceStatus = InvoiceMutation["status"]
@@ -19,7 +22,9 @@ type InvoiceRecord = {
   type: InvoiceType
   serviceDate: string
   invoiceDate: string | null
+  invoiceNumber: string | null
   expectedPaymentDate: string | null
+  pdfTotalAmount: number | null
   grossAmount: number
   discountAmount: number
   shiftDiscountAmount: number
@@ -39,7 +44,7 @@ type InvoiceResponse = {
   paymentDays: Record<InvoiceType, number>
   summary: InvoiceSummary
 }
-type ItemDraft = { key: string; description: string; quantity: string; unitAmount: string }
+type ItemDraft = { key: string; description: string; quantity: string; unitAmount: string; discountAmount: string }
 
 const typeLabels: Record<InvoiceType, string> = {
   SOMA_POS: "Soma POS",
@@ -48,25 +53,18 @@ const typeLabels: Record<InvoiceType, string> = {
   SEDARTE: "Sedarte",
 }
 
-const statusLabels: Record<InvoiceStatus, string> = {
-  PENDIENTE: "Pendiente",
-  FACTURADA: "Facturada",
-  POR_COBRAR: "Por cobrar",
-  PAGADA: "Pagada",
-  VENCIDA: "Vencida",
-}
-
 function createItem(): ItemDraft {
   return {
     key: globalThis.crypto?.randomUUID?.() ?? `item-${Date.now()}-${Math.random()}`,
     description: "",
     quantity: "1",
     unitAmount: "",
+    discountAmount: "0",
   }
 }
 
 function formatAmount(amount: number) {
-  return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(amount)
+  return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 3 }).format(amount)
 }
 
 function formatDate(date: string | null) {
@@ -83,9 +81,11 @@ function errorMessage(value: unknown, fallback: string) {
 export function InvoiceManager({
   month,
   onSummaryChange,
+  onMonthChange,
 }: {
   month: string
   onSummaryChange: (summary: InvoiceSummary) => void
+  onMonthChange: (month: string) => void
 }) {
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([])
   const [calculationSettings, setCalculationSettings] = useState<BillingSettings>(DEFAULT_BILLING_SETTINGS)
@@ -98,18 +98,23 @@ export function InvoiceManager({
   const [loadedMonth, setLoadedMonth] = useState("")
   const [refreshToken, setRefreshToken] = useState(0)
   const [type, setType] = useState<InvoiceType>("SOMA_POS")
-  const [status, setStatus] = useState<InvoiceStatus>("PENDIENTE")
+  const [storedStatus, setStoredStatus] = useState<InvoiceStatus>("FACTURADA")
+  const [storedPaidAt, setStoredPaidAt] = useState("")
   const [serviceDate, setServiceDate] = useState(`${month}-01`)
   const [invoiceDate, setInvoiceDate] = useState("")
-  const [paidAt, setPaidAt] = useState("")
+  const [invoiceNumber, setInvoiceNumber] = useState("")
+  const [expectedPaymentDateOverride, setExpectedPaymentDateOverride] = useState("")
   const [shiftDiscountAmount, setShiftDiscountAmount] = useState("0")
   const [privateShiftCount, setPrivateShiftCount] = useState("0")
   const [notes, setNotes] = useState("")
   const [items, setItems] = useState<ItemDraft[]>([createItem()])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [pdfImporting, setPdfImporting] = useState(false)
+  const [pdfReportedTotal, setPdfReportedTotal] = useState<number | null>(null)
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
+  const pdfInputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     let active = true
@@ -141,18 +146,34 @@ export function InvoiceManager({
     type,
     serviceDate,
     invoiceDate: invoiceDate || null,
-    status,
-    paidAt: status === "PAGADA" ? paidAt || null : null,
+    invoiceNumber: invoiceNumber.trim() || null,
+    expectedPaymentDate: expectedPaymentDateOverride || null,
+    pdfTotalAmount: pdfReportedTotal,
+    status: editingId ? storedStatus : "FACTURADA",
+    paidAt: editingId && storedStatus === "PAGADA" ? storedPaidAt || null : null,
     shiftDiscountAmount: type === "SOMA_POS" ? Number(shiftDiscountAmount) : 0,
     privateShiftCount: type === "SOMA_PARTICULAR" ? Number(privateShiftCount) : 0,
     notes: notes.trim(),
-    items: items.map(({ description, quantity, unitAmount }) => ({
+    items: items.map(({ description, quantity, unitAmount, discountAmount }) => ({
       description,
       quantity: Number(quantity),
       unitAmount: Number(unitAmount),
+      discountAmount: Number(discountAmount),
     })),
   }
   const parsedDraft = invoiceMutationSchema.safeParse(payload)
+  let pdfLineTotal: number | null = null
+  if (parsedDraft.success) {
+    try {
+      pdfLineTotal = addMoney(
+        ...parsedDraft.data.items.map((item) =>
+          subtractMoney(roundMoneyAmount(item.quantity * item.unitAmount), item.discountAmount ?? 0),
+        ),
+      )
+    } catch {
+      pdfLineTotal = null
+    }
+  }
   let preview: ReturnType<typeof calculateInvoiceAmounts> | null = null
   if (parsedDraft.success) {
     try {
@@ -162,29 +183,36 @@ export function InvoiceManager({
     }
   }
   const expectedPaymentDate = parsedDraft.success
-    ? getExpectedPaymentDate(serviceDate, invoiceDate || null, paymentDays[type])
+    ? (parsedDraft.data.expectedPaymentDate ??
+      getExpectedPaymentDate(serviceDate, invoiceDate || null, paymentDays[type]))
     : null
 
   function resetForm() {
     setType("SOMA_POS")
-    setStatus("PENDIENTE")
+    setStoredStatus("FACTURADA")
+    setStoredPaidAt("")
     setServiceDate(`${month}-01`)
     setInvoiceDate("")
-    setPaidAt("")
+    setInvoiceNumber("")
+    setExpectedPaymentDateOverride("")
     setShiftDiscountAmount("0")
     setPrivateShiftCount("0")
     setNotes("")
     setItems([createItem()])
     setEditingId(null)
+    setPdfReportedTotal(null)
   }
 
   function editInvoice(invoice: InvoiceRecord) {
     setEditingId(invoice.id)
     setType(invoice.type)
-    setStatus(invoice.status)
+    setStoredStatus(invoice.status)
+    setStoredPaidAt(invoice.paidAt ?? "")
     setServiceDate(invoice.serviceDate)
     setInvoiceDate(invoice.invoiceDate ?? "")
-    setPaidAt(invoice.paidAt ?? "")
+    setInvoiceNumber(invoice.invoiceNumber ?? "")
+    setExpectedPaymentDateOverride(invoice.expectedPaymentDate ?? "")
+    setPdfReportedTotal(invoice.pdfTotalAmount)
     setShiftDiscountAmount(String(invoice.shiftDiscountAmount))
     setPrivateShiftCount(String(invoice.privateShiftCount))
     setNotes(invoice.notes ?? "")
@@ -194,17 +222,58 @@ export function InvoiceManager({
         description: item.description,
         quantity: String(item.quantity),
         unitAmount: String(item.unitAmount),
+        discountAmount: String(item.discountAmount),
       })),
     )
     setError("")
     setMessage("")
   }
 
+  async function importPdf(event: ChangeEvent<HTMLInputElement>) {
+    const input = event.currentTarget
+    const file = input.files?.[0]
+    if (!file) return
+    setPdfImporting(true)
+    setError("")
+    setMessage("")
+    try {
+      const imported = parseInvoicePdfText(await extractInvoiceTextFromPdf(file))
+      setEditingId(null)
+      setInvoiceNumber(imported.invoiceNumber ?? "")
+      if (imported.type) setType(imported.type)
+      setInvoiceDate(imported.invoiceDate ?? "")
+      setExpectedPaymentDateOverride(imported.expectedPaymentDate ?? "")
+      setServiceDate(imported.serviceDate ?? imported.invoiceDate ?? `${month}-01`)
+      setItems(
+        imported.items.map((item) => ({
+          key: createItem().key,
+          description: item.description,
+          quantity: String(item.quantity),
+          unitAmount: String(item.unitAmount),
+          discountAmount: String(item.discountAmount),
+        })),
+      )
+      setShiftDiscountAmount("0")
+      setPrivateShiftCount("0")
+      setPdfReportedTotal(imported.pdfTotalAmount)
+      const serviceMonth = (imported.serviceDate ?? imported.invoiceDate)?.slice(0, 7)
+      if (serviceMonth) onMonthChange(serviceMonth)
+      setMessage(
+        `PDF leído: ${imported.items.length} partida${imported.items.length === 1 ? "" : "s"}. Revisa los datos antes de guardar.`,
+      )
+    } catch (importError) {
+      setError(errorMessage(importError, "No se pudo leer la factura. Usa un PDF con texto seleccionable."))
+    } finally {
+      setPdfImporting(false)
+      input.value = ""
+    }
+  }
+
   async function saveInvoice(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     const parsed = invoiceMutationSchema.safeParse(payload)
     if (!parsed.success) {
-      setError("Revisa fechas, partidas, descuentos y estado de pago.")
+      setError("Revisa fechas, partidas y descuentos.")
       return
     }
     setSaving(true)
@@ -253,15 +322,39 @@ export function InvoiceManager({
       <div className="invoice-manager-heading">
         <div>
           <p className="eyebrow">Finanzas</p>
-          <h2 id="invoice-manager-title">Facturas · {month}</h2>
+          {formatAmount(addMoney(...invoices.map((invoice) => invoice.netAmount)))} miles COP
         </div>
-        <span className="invoice-month-total">
-          {formatAmount(invoices.reduce((total, invoice) => total + invoice.netAmount, 0))} miles COP
-        </span>
+        <div className="invoice-manager-actions">
+          <input
+            ref={pdfInputRef}
+            aria-label="Seleccionar factura PDF"
+            className="invoice-pdf-input"
+            type="file"
+            accept=".pdf,application/pdf"
+            tabIndex={-1}
+            aria-hidden="true"
+            onChange={importPdf}
+          />
+          <button
+            type="button"
+            className="invoice-import-button"
+            disabled={pdfImporting}
+            onClick={() => pdfInputRef.current?.click()}
+          >
+            <FileUp size={15} /> {pdfImporting ? "Leyendo PDF…" : "Importar PDF"}
+          </button>
+          <span className="invoice-month-total">
+            {formatAmount(invoices.reduce((total, invoice) => total + invoice.netAmount, 0))} miles COP
+          </span>
+        </div>
       </div>
 
       <form className="invoice-form" onSubmit={saveInvoice}>
         <div className="invoice-form-grid">
+          <label className="form-field">
+            <span>Número de factura</span>
+            <input maxLength={64} value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} />
+          </label>
           <label className="form-field">
             <span>Tipo de factura</span>
             <select value={type} onChange={(event) => setType(event.target.value as InvoiceType)}>
@@ -277,45 +370,30 @@ export function InvoiceManager({
             <input type="date" required value={serviceDate} onChange={(event) => setServiceDate(event.target.value)} />
           </label>
           <label className="form-field">
-            <span>Fecha de factura · opcional</span>
+            <span>Expedición</span>
             <input type="date" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} />
           </label>
           <label className="form-field">
-            <span>Estado</span>
-            <select
-              value={status}
-              onChange={(event) => {
-                const nextStatus = event.target.value as InvoiceStatus
-                setStatus(nextStatus)
-                if (nextStatus !== "PAGADA") setPaidAt("")
-              }}
-            >
-              {Object.entries(statusLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
+            <span>Vencimiento · opcional</span>
+            <input
+              type="date"
+              value={expectedPaymentDateOverride}
+              onChange={(event) => setExpectedPaymentDateOverride(event.target.value)}
+            />
           </label>
-          {status === "PAGADA" && (
-            <label className="form-field">
-              <span>Fecha de pago</span>
-              <input type="date" required value={paidAt} onChange={(event) => setPaidAt(event.target.value)} />
-            </label>
-          )}
-          {type === "SOMA_POS" && (
+          {type === "SOMA_POS" && pdfReportedTotal === null && (
             <label className="form-field">
               <span>Descuento de turnos · miles COP</span>
               <input
                 type="number"
                 min="0"
-                step="1"
+                step="0.001"
                 value={shiftDiscountAmount}
                 onChange={(event) => setShiftDiscountAmount(event.target.value)}
               />
             </label>
           )}
-          {type === "SOMA_PARTICULAR" && (
+          {type === "SOMA_PARTICULAR" && pdfReportedTotal === null && (
             <label className="form-field">
               <span>Turnos particulares</span>
               <input
@@ -337,7 +415,10 @@ export function InvoiceManager({
         </div>
         <div className="invoice-item-list">
           {items.map((item, index) => (
-            <div className="invoice-item-row" key={item.key}>
+            <div
+              className={`invoice-item-row ${Number(item.discountAmount) > 0 ? "has-line-discount" : ""}`}
+              key={item.key}
+            >
               <label className="form-field invoice-item-description">
                 <span>Descripción</span>
                 <input
@@ -377,7 +458,7 @@ export function InvoiceManager({
                   required
                   type="number"
                   min="0"
-                  step="1"
+                  step="0.001"
                   value={item.unitAmount}
                   onChange={(event) =>
                     setItems(
@@ -388,8 +469,26 @@ export function InvoiceManager({
                   }
                 />
               </label>
+              {Number(item.discountAmount) > 0 && (
+                <label className="form-field invoice-item-discount">
+                  <span>Descuento · miles COP</span>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.001"
+                    value={item.discountAmount}
+                    onChange={(event) =>
+                      setItems(
+                        items.map((current) =>
+                          current.key === item.key ? { ...current, discountAmount: event.target.value } : current,
+                        ),
+                      )
+                    }
+                  />
+                </label>
+              )}
               <span className="invoice-item-total">
-                {formatAmount(Math.round(Number(item.quantity) * Number(item.unitAmount) || 0))}
+                {formatAmount(roundMoneyAmount(Number(item.quantity) * Number(item.unitAmount) || 0))}
               </span>
               <button
                 type="button"
@@ -420,7 +519,9 @@ export function InvoiceManager({
           </div>
           <div>
             <span>Descuentos</span>
-            <strong>{preview ? formatAmount(preview.discountAmount + preview.shiftDiscountAmount) : "—"}</strong>
+            <strong>
+              {preview ? formatAmount(addMoney(preview.discountAmount, preview.shiftDiscountAmount)) : "—"}
+            </strong>
           </div>
           {preview && preview.privateShiftAmount > 0 && (
             <div>
@@ -433,6 +534,26 @@ export function InvoiceManager({
             <strong>{preview ? formatAmount(preview.netAmount) : "—"}</strong>
           </div>
         </div>
+
+        {pdfReportedTotal !== null && pdfLineTotal !== null && pdfLineTotal !== pdfReportedTotal && (
+          <p className="invoice-pdf-warning" role="status">
+            Las partidas suman {formatAmount(pdfLineTotal)} miles COP, pero el PDF indica{" "}
+            {formatAmount(pdfReportedTotal)}. Revisa las partidas y el total importado.
+          </p>
+        )}
+
+        {pdfReportedTotal !== null && (
+          <label className="form-field pdf-total-field">
+            <span>Total a pagar del PDF · miles COP</span>
+            <input
+              type="number"
+              min="0"
+              step="0.001"
+              value={pdfReportedTotal}
+              onChange={(event) => setPdfReportedTotal(event.target.value === "" ? null : Number(event.target.value))}
+            />
+          </label>
+        )}
 
         {error && (
           <p className="form-error" role="alert">
@@ -465,10 +586,10 @@ export function InvoiceManager({
           <table className="invoice-table">
             <thead>
               <tr>
+                <th>Factura</th>
                 <th>Servicio</th>
                 <th>Tipo</th>
                 <th>Factura / vence</th>
-                <th>Estado</th>
                 <th className="amount-column">Neto</th>
                 <th />
               </tr>
@@ -476,15 +597,11 @@ export function InvoiceManager({
             <tbody>
               {invoices.map((invoice) => (
                 <tr key={invoice.id}>
+                  <td>{invoice.invoiceNumber ?? "—"}</td>
                   <td>{formatDate(invoice.serviceDate)}</td>
                   <td>{typeLabels[invoice.type]}</td>
                   <td>
                     {formatDate(invoice.invoiceDate)} / {formatDate(invoice.expectedPaymentDate)}
-                  </td>
-                  <td>
-                    <span className={`invoice-status status-${invoice.status.toLowerCase()}`}>
-                      {statusLabels[invoice.status]}
-                    </span>
                   </td>
                   <td className="amount-column">{formatAmount(invoice.netAmount)}</td>
                   <td className="invoice-row-actions">

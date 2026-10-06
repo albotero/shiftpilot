@@ -43,20 +43,56 @@ describe("invoice service", () => {
     expect(calculateInvoiceAmounts(sedarte)).toMatchObject({ discountAmount: 0, netAmount: 1000 })
   })
 
-  it("rounds line gross amounts to integer thousands and computes due dates from invoice date", () => {
+  it("preserves fractional line amounts and computes due dates from invoice date", () => {
     const invoice = invoiceMutationSchema.parse({
       ...baseInvoice,
       type: "SOMA_PREPAGADA",
       items: [{ description: "Cantidad parcial", quantity: 1.25, unitAmount: 101 }],
     })
 
-    expect(calculateInvoiceAmounts(invoice).items[0].grossAmount).toBe(126)
+    expect(calculateInvoiceAmounts(invoice).items[0].grossAmount).toBe(126.25)
     expect(getInvoicePaymentDays("SOMA_POS", {})).toBe(90)
     expect(getInvoicePaymentDays("SOMA_PREPAGADA", {})).toBe(60)
     expect(getInvoicePaymentDays("SOMA_PARTICULAR", {})).toBe(30)
     expect(getInvoicePaymentDays("SEDARTE", {})).toBe(0)
     expect(getExpectedPaymentDate("2026-10-01", "2026-10-03", 90)).toBe("2027-01-01")
     expect(getExpectedPaymentDate("2026-10-01", null, 0)).toBe("2026-10-01")
+  })
+
+  it("applies PDF line discounts before the invoice type discount", () => {
+    const invoice = invoiceMutationSchema.parse({
+      ...baseInvoice,
+      type: "SOMA_POS",
+      items: [{ description: "Servicio con descuento", quantity: 1, unitAmount: 1000, discountAmount: 50 }],
+    })
+
+    expect(calculateInvoiceAmounts(invoice)).toMatchObject({
+      grossAmount: 1000,
+      discountAmount: 164,
+      netAmount: 836,
+      items: [{ grossAmount: 1000, discountAmount: 50 }],
+    })
+  })
+
+  it("uses imported PDF totals without applying any Soma discounts or fees again", () => {
+    for (const type of ["SOMA_POS", "SOMA_PREPAGADA", "SOMA_PARTICULAR"] as const) {
+      const invoice = invoiceMutationSchema.parse({
+        ...baseInvoice,
+        type,
+        pdfTotalAmount: 800,
+        ...(type === "SOMA_POS" ? { shiftDiscountAmount: 50 } : {}),
+        ...(type === "SOMA_PARTICULAR" ? { privateShiftCount: 2 } : {}),
+        items: [{ description: "Servicio ya liquidado", quantity: 1, unitAmount: 1000, discountAmount: 100 }],
+      })
+
+      expect(calculateInvoiceAmounts(invoice)).toMatchObject({
+        grossAmount: 1000,
+        discountAmount: 200,
+        shiftDiscountAmount: 0,
+        privateShiftAmount: 0,
+        netAmount: 800,
+      })
+    }
   })
 
   it("rejects discounts and payment metadata on incompatible invoice types or statuses", () => {

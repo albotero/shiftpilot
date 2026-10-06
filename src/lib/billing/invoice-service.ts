@@ -7,10 +7,18 @@ import {
   DEFAULT_BILLING_SETTINGS,
   type BillingSettings,
 } from "./calculations"
-import { assertMoneyAmount } from "@/lib/money/integer"
+import { addMoney, assertMoneyAmount, roundMoneyAmount, subtractMoney } from "@/lib/money/integer"
 
 export const invoiceTypes = ["SOMA_POS", "SOMA_PREPAGADA", "SOMA_PARTICULAR", "SEDARTE"] as const
 export const invoiceStatuses = ["PENDIENTE", "FACTURADA", "POR_COBRAR", "PAGADA", "VENCIDA"] as const
+
+function moneyAmountSchema() {
+  return z
+    .number()
+    .nonnegative()
+    .max(Number.MAX_SAFE_INTEGER / 1000)
+    .refine((amount) => Math.abs(amount * 1000 - Math.round(amount * 1000)) < 0.000001, "Usa máximo tres decimales")
+}
 
 const invoiceItemSchema = z.object({
   description: z.string().trim().min(1).max(120),
@@ -19,7 +27,8 @@ const invoiceItemSchema = z.object({
     .positive()
     .max(999999)
     .refine((quantity) => Number.isInteger(quantity * 100), "Usa máximo dos decimales en la cantidad"),
-  unitAmount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  unitAmount: moneyAmountSchema(),
+  discountAmount: moneyAmountSchema().optional(),
 })
 
 export const invoiceMutationSchema = z
@@ -28,9 +37,12 @@ export const invoiceMutationSchema = z
     type: z.enum(invoiceTypes),
     serviceDate: z.iso.date(),
     invoiceDate: z.union([z.iso.date(), z.null()]).optional(),
+    invoiceNumber: z.string().trim().max(64).nullable().optional(),
+    expectedPaymentDate: z.union([z.iso.date(), z.null()]).optional(),
+    pdfTotalAmount: moneyAmountSchema().nullable().optional(),
     status: z.enum(invoiceStatuses),
     paidAt: z.union([z.iso.date(), z.null()]).optional(),
-    shiftDiscountAmount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
+    shiftDiscountAmount: moneyAmountSchema().optional(),
     privateShiftCount: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
     notes: z.string().trim().max(500).optional(),
     items: z.array(invoiceItemSchema).min(1).max(100),
@@ -65,27 +77,52 @@ export function calculateInvoiceAmounts(
   settings: BillingSettings = DEFAULT_BILLING_SETTINGS,
 ) {
   const items = invoice.items.map((item) => {
-    const grossAmount = Math.round(item.quantity * item.unitAmount)
+    const grossAmount = roundMoneyAmount(item.quantity * item.unitAmount)
+    const discountAmount = item.discountAmount ?? 0
     assertMoneyAmount(grossAmount, "invoiceItem.grossAmount")
-    return { ...item, grossAmount }
+    assertMoneyAmount(discountAmount, "invoiceItem.discountAmount")
+    if (discountAmount > grossAmount) throw new RangeError("Invoice item discounts cannot exceed its gross amount")
+    return { ...item, discountAmount, grossAmount }
   })
-  const grossAmount = items.reduce((total, item) => total + item.grossAmount, 0)
+  const grossAmount = addMoney(...items.map((item) => item.grossAmount))
+  const itemDiscountAmount = addMoney(...items.map((item) => item.discountAmount))
   assertMoneyAmount(grossAmount, "grossAmount")
+  assertMoneyAmount(itemDiscountAmount, "itemDiscountAmount")
+
+  if (invoice.pdfTotalAmount !== undefined && invoice.pdfTotalAmount !== null) {
+    assertMoneyAmount(invoice.pdfTotalAmount, "pdfTotalAmount")
+    if (invoice.pdfTotalAmount > grossAmount) throw new RangeError("Invoice PDF total cannot exceed gross amount")
+    return {
+      items,
+      grossAmount,
+      discountAmount: subtractMoney(grossAmount, invoice.pdfTotalAmount),
+      shiftDiscountAmount: 0,
+      privateShiftAmount: 0,
+      netAmount: invoice.pdfTotalAmount,
+    }
+  }
+
+  const calculationBase = subtractMoney(grossAmount, itemDiscountAmount)
 
   const calculation = (() => {
     switch (invoice.type) {
       case "SOMA_POS":
-        return calculatePosInvoice(grossAmount, invoice.shiftDiscountAmount ?? 0, settings)
+        return calculatePosInvoice(calculationBase, invoice.shiftDiscountAmount ?? 0, settings)
       case "SOMA_PREPAGADA":
-        return calculatePrepaidInvoice(grossAmount, settings)
+        return calculatePrepaidInvoice(calculationBase, settings)
       case "SOMA_PARTICULAR":
-        return calculateParticularInvoice(grossAmount, invoice.privateShiftCount ?? 0, settings)
+        return calculateParticularInvoice(calculationBase, invoice.privateShiftCount ?? 0, settings)
       case "SEDARTE":
-        return calculateSedarteInvoice(grossAmount)
+        return calculateSedarteInvoice(calculationBase)
     }
   })()
 
-  return { items, ...calculation }
+  return {
+    items,
+    ...calculation,
+    grossAmount,
+    discountAmount: addMoney(calculation.discountAmount, itemDiscountAmount),
+  }
 }
 
 export function getInvoicePaymentDays(type: InvoiceMutation["type"], settings: Record<string, number>) {

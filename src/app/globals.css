@@ -1954,6 +1954,29 @@ a {
   background: #fff;
 }
 
+.finance-page-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.finance-month-picker {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: #78827d;
+  font-size: 10px;
+}
+
+.finance-month-picker input {
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid #dfe6dc;
+  border-radius: 5px;
+  background: #fff;
+  color: #33443b;
+}
+
 .invoice-manager-heading,
 .invoice-items-heading,
 .invoice-form-actions {
@@ -1979,6 +2002,43 @@ a {
   color: #3e6745;
   font-size: 13px;
   font-weight: 700;
+  white-space: nowrap;
+}
+
+.invoice-manager-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.invoice-import-button {
+  display: inline-flex;
+  min-height: 32px;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid #d8e2d5;
+  border-radius: 5px;
+  background: #fff;
+  color: #48694b;
+  cursor: pointer;
+  font-size: 10px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.invoice-import-button:disabled {
+  cursor: progress;
+  opacity: 0.65;
+}
+
+.invoice-pdf-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
   white-space: nowrap;
 }
 
@@ -2025,6 +2085,10 @@ a {
   grid-template-columns: minmax(130px, 1fr) minmax(76px, 0.38fr) minmax(125px, 0.7fr) 72px 30px;
   align-items: end;
   gap: 8px;
+}
+
+.invoice-item-row.has-line-discount {
+  grid-template-columns: minmax(130px, 1fr) minmax(76px, 0.38fr) minmax(125px, 0.7fr) minmax(100px, 0.6fr) 72px 30px;
 }
 
 .invoice-item-total {
@@ -2081,6 +2145,18 @@ a {
   font-size: 13px;
 }
 
+.invoice-pdf-warning {
+  margin: 0;
+  color: #a35d2c;
+  font-size: 10px;
+  line-height: 1.45;
+}
+
+.pdf-total-field {
+  width: min(100%, 260px);
+  margin-left: auto;
+}
+
 .invoice-form-actions {
   justify-content: flex-end;
 }
@@ -2103,7 +2179,7 @@ a {
 
 .invoice-table {
   width: 100%;
-  min-width: 680px;
+  min-width: 740px;
   border-collapse: collapse;
   text-align: left;
 }
@@ -2794,6 +2870,22 @@ a {
     padding: 12px;
   }
 
+  .finance-page-actions {
+    align-items: flex-end;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .invoice-manager-actions {
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 5px;
+  }
+
+  .invoice-month-total {
+    font-size: 10px;
+  }
+
   .invoice-form-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -2805,6 +2897,10 @@ a {
     border-bottom: 1px solid #e7ebe5;
   }
 
+  .invoice-item-row.has-line-discount {
+    grid-template-columns: minmax(0, 1fr) minmax(72px, 0.55fr);
+  }
+
   .invoice-item-description {
     grid-column: 1 / -1;
   }
@@ -2813,6 +2909,10 @@ a {
     grid-column: 1;
     padding: 0 4px;
     text-align: left;
+  }
+
+  .invoice-item-discount {
+    grid-column: 1 / -1;
   }
 
   .invoice-remove-item {

@@ -1,4 +1,4 @@
-import { assertMoneyAmount } from "@/lib/money/integer"
+import { addMoney, assertMoneyAmount, minMoney, subtractMoney } from "@/lib/money/integer"
 
 export type DebtScheduleLine = {
   installment: number
@@ -62,7 +62,7 @@ export function calculatePaymentAllocation(schedule: DebtScheduleLine[], payment
       ...line,
       principalLeft: line.principalAmount,
       interestLeft: line.interestAmount,
-      unclassifiedLeft: Math.max(0, line.paymentAmount - line.principalAmount - line.interestAmount),
+      unclassifiedLeft: Math.max(0, subtractMoney(line.paymentAmount, line.principalAmount, line.interestAmount)),
     }))
   const allocations: PaymentAllocation[] = []
 
@@ -73,19 +73,19 @@ export function calculatePaymentAllocation(schedule: DebtScheduleLine[], payment
 
     for (const line of outstanding) {
       if (unapplied === 0) break
-      const interestAmount = Math.min(line.interestLeft, unapplied)
-      line.interestLeft -= interestAmount
-      unapplied -= interestAmount
+      const interestAmount = minMoney(line.interestLeft, unapplied)
+      line.interestLeft = subtractMoney(line.interestLeft, interestAmount)
+      unapplied = subtractMoney(unapplied, interestAmount)
 
-      const principalAmount = Math.min(line.principalLeft, unapplied)
-      line.principalLeft -= principalAmount
-      unapplied -= principalAmount
+      const principalAmount = minMoney(line.principalLeft, unapplied)
+      line.principalLeft = subtractMoney(line.principalLeft, principalAmount)
+      unapplied = subtractMoney(unapplied, principalAmount)
 
-      const unclassifiedAmount = Math.min(line.unclassifiedLeft, unapplied)
-      line.unclassifiedLeft -= unclassifiedAmount
-      unapplied -= unclassifiedAmount
+      const unclassifiedAmount = minMoney(line.unclassifiedLeft, unapplied)
+      line.unclassifiedLeft = subtractMoney(line.unclassifiedLeft, unclassifiedAmount)
+      unapplied = subtractMoney(unapplied, unclassifiedAmount)
 
-      if (interestAmount + principalAmount + unclassifiedAmount > 0) {
+      if (addMoney(interestAmount, principalAmount, unclassifiedAmount) > 0) {
         allocations.push({ installment: line.installment, principalAmount, interestAmount, unclassifiedAmount })
       }
     }
@@ -96,22 +96,23 @@ export function calculatePaymentAllocation(schedule: DebtScheduleLine[], payment
 
 export function calculateDebtSummary(schedule: DebtScheduleLine[], payments: DebtPayment[], asOf: string): DebtSummary {
   const allocations = calculatePaymentAllocation(schedule, payments)
-  const principalPaid = allocations.reduce((total, line) => total + line.principalAmount, 0)
-  const interestPaid = allocations.reduce((total, line) => total + line.interestAmount, 0)
-  const unclassifiedPaid = allocations.reduce((total, line) => total + line.unclassifiedAmount, 0)
-  const scheduledAmount = schedule.reduce((total, line) => total + line.paymentAmount, 0)
-  const scheduleDifference = schedule.reduce(
-    (total, line) => total + line.paymentAmount - line.interestAmount - line.principalAmount,
-    0,
+  const principalPaid = addMoney(...allocations.map((line) => line.principalAmount))
+  const interestPaid = addMoney(...allocations.map((line) => line.interestAmount))
+  const unclassifiedPaid = addMoney(...allocations.map((line) => line.unclassifiedAmount))
+  const scheduledAmount = addMoney(...schedule.map((line) => line.paymentAmount))
+  const scheduleDifference = subtractMoney(
+    addMoney(...schedule.map((line) => line.paymentAmount)),
+    addMoney(...schedule.map((line) => line.interestAmount)),
+    addMoney(...schedule.map((line) => line.principalAmount)),
   )
-  const paymentsApplied = payments.reduce((total, payment) => total + payment.amount, 0)
+  const paymentsApplied = addMoney(...payments.map((payment) => payment.amount))
   const fullyPaid = new Set<number>()
   for (const line of schedule) {
     const applied = allocations
       .filter((allocation) => allocation.installment === line.installment)
       .reduce(
         (total, allocation) =>
-          total + allocation.principalAmount + allocation.interestAmount + allocation.unclassifiedAmount,
+          addMoney(total, allocation.principalAmount, allocation.interestAmount, allocation.unclassifiedAmount),
         0,
       )
     if (applied === line.paymentAmount) fullyPaid.add(line.installment)
@@ -123,13 +124,13 @@ export function calculateDebtSummary(schedule: DebtScheduleLine[], payments: Deb
 
   return {
     scheduledAmount,
-    balanceAmount: Math.max(0, scheduledAmount - paymentsApplied),
+    balanceAmount: Math.max(0, subtractMoney(scheduledAmount, paymentsApplied)),
     principalPaid,
     interestPaid,
     unclassifiedPaid,
     scheduleDifference,
     paymentsApplied,
-    parkingPaid: payments.reduce((total, payment) => total + payment.parkingAmount, 0),
+    parkingPaid: addMoney(...payments.map((payment) => payment.parkingAmount)),
     pendingInstallments: pendingLines.filter((line) => line.dueDate <= asOf).map((line) => line.installment),
     nextInstallment: pendingLines[0]?.installment ?? null,
   }

@@ -8,6 +8,7 @@ import {
 import { calculateDebtSummary } from "@/lib/debt/calculations"
 import { getDebtPlanSnapshot } from "@/lib/debt/plan-snapshot"
 import { calculateIbc, calculateSocialSecurity } from "@/lib/social-security/calculations"
+import { assertMoneyAmount, percentageOf } from "@/lib/money/integer"
 import { initialDebtSchedule } from "../../prisma/debt-schedule"
 
 describe("billing calculations in thousands of COP", () => {
@@ -34,12 +35,21 @@ describe("billing calculations in thousands of COP", () => {
   it("does not discount Sedarte", () => {
     expect(calculateSedarteInvoice(1000).netAmount).toBe(1000)
   })
+
+  it("preserves peso fractions through billing percentages and discounts", () => {
+    expect(calculatePosInvoice(1234.567, 0.001)).toMatchObject({
+      grossAmount: 1234.567,
+      discountAmount: 148.148,
+      shiftDiscountAmount: 0.001,
+      netAmount: 1086.418,
+    })
+  })
 })
 
 describe("social security calculations", () => {
-  it("calculates a 40% IBC using integer money", () => {
+  it("calculates a 40% IBC without dropping pesos", () => {
     expect(calculateIbc(1000)).toBe(400)
-    expect(calculateIbc(1001)).toBe(400)
+    expect(calculateIbc(1001)).toBe(400.4)
   })
 
   it("rounds each contribution upward to one decimal in thousands of COP", () => {
@@ -50,6 +60,13 @@ describe("social security calculations", () => {
       fundAmountTenths: 100,
       totalAmountTenths: 3194,
     })
+  })
+
+  it("preserves whole-peso precision in amounts expressed as thousands of COP", () => {
+    assertMoneyAmount(47_445.123)
+    expect(calculateIbc(47_445.123)).toBe(18_978.049)
+    expect(percentageOf(47_445.123, 120_000)).toBe(5_693.415)
+    expect(() => assertMoneyAmount(47_445.1234)).toThrow(/three decimals/i)
   })
 })
 
@@ -93,6 +110,34 @@ describe("fixed debt schedule", () => {
       parkingPaid: 150,
       pendingInstallments: [1, 2],
       nextInstallment: 1,
+    })
+  })
+
+  it("preserves peso fractions when allocating debt payments", () => {
+    const result = calculateDebtSummary(
+      [
+        {
+          installment: 1,
+          dueDate: "2026-09-01",
+          previousBalance: 2.001,
+          monthlyInterest: 0.001,
+          paymentAmount: 2.001,
+          interestAmount: 0.001,
+          principalAmount: 2,
+          remainingBalance: 0,
+        },
+      ],
+      [{ paidAt: "2026-09-10", amount: 1.001, parkingAmount: 0.001 }],
+      "2026-10-05",
+    )
+
+    expect(result).toMatchObject({
+      scheduledAmount: 2.001,
+      balanceAmount: 1,
+      interestPaid: 0.001,
+      principalPaid: 1,
+      paymentsApplied: 1.001,
+      parkingPaid: 0.001,
     })
   })
 

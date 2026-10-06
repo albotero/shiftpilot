@@ -7,6 +7,7 @@ import {
   invoiceMutationSchema,
 } from "@/lib/billing/invoice-service"
 import { DEFAULT_BILLING_SETTINGS, type BillingSettings } from "@/lib/billing/calculations"
+import { addMoney, assertMoneyAmount } from "@/lib/money/integer"
 import { prisma } from "@/server/db"
 
 export const dynamic = "force-dynamic"
@@ -25,13 +26,15 @@ function mapInvoice(invoice: InvoiceWithItems) {
     type: invoice.type,
     serviceDate: dateKey(invoice.serviceDate),
     invoiceDate: dateKey(invoice.invoiceDate),
+    invoiceNumber: invoice.invoiceNumber,
     expectedPaymentDate: dateKey(invoice.expectedPaymentDate),
-    grossAmount: invoice.grossAmount,
-    discountAmount: invoice.discountAmount,
-    shiftDiscountAmount: invoice.shiftDiscountAmount,
-    netAmount: invoice.netAmount,
+    pdfTotalAmount: invoice.pdfTotalAmount === null ? null : Number(invoice.pdfTotalAmount),
+    grossAmount: Number(invoice.grossAmount),
+    discountAmount: Number(invoice.discountAmount),
+    shiftDiscountAmount: Number(invoice.shiftDiscountAmount),
+    netAmount: Number(invoice.netAmount),
     privateShiftCount: invoice.privateShiftCount,
-    privateShiftAmount: invoice.privateShiftAmount,
+    privateShiftAmount: Number(invoice.privateShiftAmount),
     status: invoice.status,
     paidAt: dateKey(invoice.paidAt),
     notes: invoice.notes,
@@ -39,8 +42,9 @@ function mapInvoice(invoice: InvoiceWithItems) {
       id: item.id,
       description: item.description,
       quantity: Number(item.quantity),
-      unitAmount: item.unitAmount,
-      grossAmount: item.grossAmount,
+      unitAmount: Number(item.unitAmount),
+      discountAmount: Number(item.discountAmount),
+      grossAmount: Number(item.grossAmount),
     })),
   }
 }
@@ -49,9 +53,15 @@ async function getBillingSettings() {
   const records = await prisma.appSetting.findMany({ where: { key: { startsWith: "billing." } } })
   const values: Record<string, number> = {}
   for (const record of records) {
-    if (typeof record.value === "number" && Number.isSafeInteger(record.value) && record.value >= 0) {
-      values[record.key] = record.value
-    }
+    if (typeof record.value !== "number" || record.value < 0) continue
+    if (record.key === "billing.particular.shiftAmount") {
+      try {
+        assertMoneyAmount(record.value)
+      } catch {
+        continue
+      }
+    } else if (!Number.isSafeInteger(record.value)) continue
+    values[record.key] = record.value
   }
   const setting = (key: string, fallback: number) => values[key] ?? fallback
   const calculationSettings: BillingSettings = {
@@ -80,7 +90,9 @@ async function buildInvoiceData(input: InvoiceMutation, workId: string, replaceI
     type: input.type,
     serviceDate: new Date(`${input.serviceDate}T00:00:00.000Z`),
     invoiceDate: input.invoiceDate ? new Date(`${input.invoiceDate}T00:00:00.000Z`) : null,
-    expectedPaymentDate: new Date(`${dueDate}T00:00:00.000Z`),
+    invoiceNumber: input.invoiceNumber || null,
+    expectedPaymentDate: new Date(`${input.expectedPaymentDate ?? dueDate}T00:00:00.000Z`),
+    pdfTotalAmount: input.pdfTotalAmount ?? null,
     grossAmount: totals.grossAmount,
     discountAmount: totals.discountAmount,
     shiftDiscountAmount: totals.shiftDiscountAmount,
@@ -96,6 +108,7 @@ async function buildInvoiceData(input: InvoiceMutation, workId: string, replaceI
         description: item.description,
         quantity: item.quantity,
         unitAmount: item.unitAmount,
+        discountAmount: item.discountAmount ?? 0,
         grossAmount: item.grossAmount,
       })),
     },
@@ -166,7 +179,7 @@ export async function GET(request: Request) {
       },
       summary: {
         count: invoices.length,
-        netAmount: invoices.reduce((total, invoice) => total + invoice.netAmount, 0),
+        netAmount: addMoney(...invoices.map((invoice) => invoice.netAmount)),
       },
     })
   } catch {

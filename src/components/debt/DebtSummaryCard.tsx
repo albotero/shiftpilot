@@ -1,10 +1,11 @@
 import { ArrowUpRight, CreditCard } from "lucide-react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import Link from "next/link"
 import { getDebtPlanSnapshot } from "@/lib/debt/plan-snapshot"
 
 function formatAmount(amount: number) {
-  return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(amount)
+  return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 3 }).format(amount)
 }
 
 export function DebtSummaryCard() {
@@ -57,9 +58,9 @@ export function DebtSummaryCard() {
         </span>
       </div>
       <p className="debt-no-late-interest">Sin interés de mora · parqueadero fuera del saldo</p>
-      <a href="#debt" className="debt-link">
+      <Link href="/debt" className="debt-link">
         Ver detalle del plan <ArrowUpRight size={14} />
-      </a>
+      </Link>
     </section>
   )
 }
