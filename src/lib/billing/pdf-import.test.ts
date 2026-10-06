@@ -17,7 +17,7 @@ Total a Pagar 800,000.00
 describe("invoice PDF import parser", () => {
   it("parses the invoice number, dates, type, one item, and COP amounts in thousands", () => {
     expect(parseInvoicePdfText(oneItemInvoice)).toEqual({
-      invoiceNumber: "SF 177",
+      invoiceNumber: "SF177",
       type: "SEDARTE",
       serviceDate: "2026-10-05",
       invoiceDate: "2026-10-05",
@@ -46,7 +46,7 @@ describe("invoice PDF import parser", () => {
     `
 
     expect(parseInvoicePdfText(text)).toMatchObject({
-      invoiceNumber: "FV 204",
+      invoiceNumber: "FV204",
       type: null,
       serviceDate: "2026-10-06",
       invoiceDate: "2026-10-06",
@@ -71,7 +71,7 @@ describe("invoice PDF import parser", () => {
     `
 
     expect(parseInvoicePdfText(text)).toMatchObject({
-      invoiceNumber: "SF 174",
+      invoiceNumber: "SF174",
       type: "SOMA_POS",
       serviceDate: "2026-09-30",
       invoiceDate: "2026-09-30",
@@ -97,7 +97,7 @@ describe("invoice PDF import parser", () => {
     const imported = parseInvoicePdfText(text)
 
     expect(imported).toMatchObject({
-      invoiceNumber: "SF 171",
+      invoiceNumber: "SF171",
       type: "SEDARTE",
       serviceDate: "2026-09-02",
       invoiceDate: "2026-09-02",

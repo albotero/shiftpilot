@@ -107,7 +107,7 @@ describe("invoice routes", () => {
         type: "SOMA_POS",
         serviceDate: "2026-09-30",
         invoiceDate: "2026-09-30",
-        invoiceNumber: "SF 174",
+        invoiceNumber: "SF174",
         expectedPaymentDate: "2026-12-29",
         pdfTotalAmount: 30620.458,
         status: "FACTURADA",
@@ -125,7 +125,7 @@ describe("invoice routes", () => {
 
     expect(response.status).toBe(201)
     expect(invoice).toMatchObject({
-      invoiceNumber: "SF 174",
+      invoiceNumber: "SF174",
       expectedPaymentDate: "2026-12-29",
       pdfTotalAmount: 30620.458,
       grossAmount: 47445.123,
@@ -137,7 +137,7 @@ describe("invoice routes", () => {
     expect(prismaMock.prisma.invoice.create).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({
-          invoiceNumber: "SF 174",
+          invoiceNumber: "SF174",
           expectedPaymentDate: new Date("2026-12-29T00:00:00.000Z"),
           pdfTotalAmount: 30620.458,
           items: {

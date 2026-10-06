@@ -98,7 +98,7 @@ export function parseInvoicePdfText(sourceText: string): ImportedInvoice {
     .filter((date): date is string => date !== null)
     .sort()
   const invoiceDate = findDate(text, "Expedición") ?? findDate(text, "Generación")
-  const invoiceNumber = /\bNo\.?\s*([A-Z]{1,8}\s*-?\s*\d+)\b/i.exec(text)?.[1]?.replace(/\s+/g, " ") ?? null
+  const invoiceNumber = /\bNo\.?\s*([A-Z]{1,8}\s*-?\s*\d+)\b/i.exec(text)?.[1]?.replace(/\s+/g, "") ?? null
   const totalMatch = new RegExp(`Total\\s+a\\s+Pagar\\s*\\$?\\s*(${amountPattern})`, "i").exec(text)
   const pdfTotalAmount = totalMatch ? amountInThousands(totalMatch[1]) : null
   if (pdfTotalAmount === null) throw new Error("No se encontró el total a pagar de la factura.")

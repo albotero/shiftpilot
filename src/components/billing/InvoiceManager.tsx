@@ -141,10 +141,11 @@ export function InvoiceManager({
     }
   }, [month, onSummaryChange, refreshToken])
 
+  const effectiveServiceDate = invoiceDate || (editingId ? serviceDate : `${month}-01`)
   const payload = {
     ...(editingId ? { id: editingId } : {}),
     type,
-    serviceDate,
+    serviceDate: effectiveServiceDate,
     invoiceDate: invoiceDate || null,
     invoiceNumber: invoiceNumber.trim() || null,
     expectedPaymentDate: expectedPaymentDateOverride || null,
@@ -184,7 +185,7 @@ export function InvoiceManager({
   }
   const expectedPaymentDate = parsedDraft.success
     ? (parsedDraft.data.expectedPaymentDate ??
-      getExpectedPaymentDate(serviceDate, invoiceDate || null, paymentDays[type]))
+      getExpectedPaymentDate(effectiveServiceDate, invoiceDate || null, paymentDays[type]))
     : null
 
   function resetForm() {
@@ -241,7 +242,7 @@ export function InvoiceManager({
       setEditingId(null)
       setInvoiceNumber(imported.invoiceNumber ?? "")
       if (imported.type) setType(imported.type)
-      setInvoiceDate(imported.invoiceDate ?? "")
+      setInvoiceDate(imported.invoiceDate ?? imported.serviceDate ?? "")
       setExpectedPaymentDateOverride(imported.expectedPaymentDate ?? "")
       setServiceDate(imported.serviceDate ?? imported.invoiceDate ?? `${month}-01`)
       setItems(
@@ -366,12 +367,21 @@ export function InvoiceManager({
             </select>
           </label>
           <label className="form-field">
-            <span>Fecha de servicio</span>
-            <input type="date" required value={serviceDate} onChange={(event) => setServiceDate(event.target.value)} />
-          </label>
-          <label className="form-field">
             <span>Expedición</span>
-            <input type="date" value={invoiceDate} onChange={(event) => setInvoiceDate(event.target.value)} />
+            <input
+              type="date"
+              value={invoiceDate}
+              onChange={(event) => {
+                const nextDate = event.target.value
+                setInvoiceDate(nextDate)
+                if (nextDate) {
+                  setServiceDate(nextDate)
+                  onMonthChange(nextDate.slice(0, 7))
+                } else if (!editingId) {
+                  setServiceDate(`${month}-01`)
+                }
+              }}
+            />
           </label>
           <label className="form-field">
             <span>Vencimiento · opcional</span>
