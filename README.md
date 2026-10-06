@@ -107,7 +107,7 @@ El seed es idempotente para una base ya inicializada. Crea Soma y Sedarte, valor
 
 El plan conserva cada columna de origen. La fila de abril de 2030 contiene una diferencia de `1` (mil COP) entre el pago y la suma de interés más capital; el cálculo la mantiene como diferencia no clasificada. El seed se detiene si encuentra un plan existente que no coincide, en vez de sobrescribirlo. Para empezar con datos distintos, personaliza el seed antes de inicializar la base de tu fork.
 
-Compose ejecuta el seed cada vez que arranca el contenedor de la aplicación. Las claves de configuración se actualizan con los valores declarados en `prisma/seed.ts`; si cambias esos valores directamente en la base, el siguiente arranque los restablece. Trata el seed como la fuente de los valores iniciales de tu fork.
+El seed no se ejecuta al arrancar la aplicación: conserva `db:seed` como paso explícito de inicialización para una base nueva. Así, reiniciar o desplegar no restablece valores de configuración que ya hayas editado.
 
 ## Despliegue en tu servidor
 
@@ -117,6 +117,12 @@ En un servidor Linux con Docker Compose, clona tu fork, crea `.env`, establece u
 docker compose up -d --build
 docker compose ps
 docker compose logs -f app
+```
+
+Solo al inicializar una base vacía por primera vez, carga los datos iniciales con:
+
+```bash
+docker compose run --rm --no-deps app npm run db:seed
 ```
 
 La aplicación no tiene login, roles ni control de acceso. Mantén el servicio en loopback o en una red privada. Si necesitas publicarlo, añade primero autenticación y HTTPS mediante una arquitectura de acceso que controles; no publiques PostgreSQL.
