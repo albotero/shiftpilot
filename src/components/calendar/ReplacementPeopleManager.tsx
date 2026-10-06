@@ -1,7 +1,7 @@
 "use client"
 
 import { useEffect, useState, type FormEvent } from "react"
-import { Pencil, Plus, RotateCcw, Trash2, UserRound, X } from "lucide-react"
+import { Pencil, Plus, ToggleLeft, ToggleRight, Trash2, UserRound, X } from "lucide-react"
 
 type ReplacementPerson = {
   id: string
@@ -13,6 +13,13 @@ type ReplacementPerson = {
 }
 
 const emptyForm = { name: "", phone: "", email: "", notes: "" }
+
+function sortReplacementPeople(people: ReplacementPerson[]) {
+  return [...people].sort((left, right) => {
+    if (left.active !== right.active) return left.active ? -1 : 1
+    return left.name.localeCompare(right.name, "es", { sensitivity: "base" })
+  })
+}
 
 export function ReplacementPeopleManager() {
   const [people, setPeople] = useState<ReplacementPerson[]>([])
@@ -30,7 +37,7 @@ export function ReplacementPeopleManager() {
       const response = await fetch("/api/replacement-people?includeInactive=true", { cache: "no-store" })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error ?? "No se pudo consultar el catálogo.")
-      setPeople(result as ReplacementPerson[])
+      setPeople(sortReplacementPeople(result as ReplacementPerson[]))
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "No se pudo consultar el catálogo.")
     } finally {
@@ -44,7 +51,7 @@ export function ReplacementPeopleManager() {
       .then(async (response) => {
         const result = await response.json()
         if (!response.ok) throw new Error(result.error ?? "No se pudo consultar el catálogo.")
-        if (active) setPeople(result as ReplacementPerson[])
+        if (active) setPeople(sortReplacementPeople(result as ReplacementPerson[]))
       })
       .catch((loadError) => {
         if (active) setError(loadError instanceof Error ? loadError.message : "No se pudo consultar el catálogo.")
@@ -231,16 +238,27 @@ export function ReplacementPeopleManager() {
           {people.map((person) => (
             <li key={person.id} className={!person.active ? "inactive" : ""}>
               <div className="replacement-person-copy">
-                <strong>{person.name}</strong>
-                <span>
-                  {[person.phone, person.email].filter(Boolean).join(" · ") || (person.active ? "Activo" : "Inactivo")}
-                </span>
+                <div className="replacement-person-name">
+                  <strong>{person.name}</strong>
+                  <span
+                    className={`replacement-person-status ${person.active ? "active" : "inactive"}`}
+                    role="img"
+                    aria-label={person.active ? "Activo" : "Inactivo"}
+                    title={person.active ? "Activo" : "Inactivo"}
+                  />
+                </div>
+                {[person.phone, person.email].filter(Boolean).length > 0 && (
+                  <span className="replacement-person-contact">
+                    {[person.phone, person.email].filter(Boolean).join(" · ")}
+                  </span>
+                )}
               </div>
               <div className="replacement-person-row-actions">
                 <button
                   type="button"
                   className="icon-button"
                   aria-label={`Editar ${person.name}`}
+                  title={`Editar ${person.name}`}
                   onClick={() => startEdit(person)}
                 >
                   <Pencil size={15} />
@@ -249,14 +267,17 @@ export function ReplacementPeopleManager() {
                   type="button"
                   className="icon-button"
                   aria-label={person.active ? `Desactivar ${person.name}` : `Reactivar ${person.name}`}
+                  title={person.active ? `Desactivar ${person.name}` : `Reactivar ${person.name}`}
+                  aria-pressed={person.active}
                   onClick={() => void toggleActive(person)}
                 >
-                  <RotateCcw size={15} />
+                  {person.active ? <ToggleRight size={17} /> : <ToggleLeft size={17} />}
                 </button>
                 <button
                   type="button"
                   className="icon-button danger"
                   aria-label={`Eliminar ${person.name}`}
+                  title={`Eliminar ${person.name}`}
                   onClick={() => void deletePerson(person)}
                 >
                   <Trash2 size={15} />

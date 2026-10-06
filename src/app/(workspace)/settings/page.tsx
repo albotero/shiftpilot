@@ -1,6 +1,7 @@
 import { ReplacementPeopleManager } from "@/components/calendar/ReplacementPeopleManager"
 import { SomaAnnualPlanForm } from "@/components/calendar/SomaAnnualPlanForm"
 import { PageHeading } from "@/components/dashboard/PageHeading"
+import { SocialSecuritySettingsManager } from "@/components/settings/SocialSecuritySettingsManager"
 import { TelegramConnectionCard } from "@/components/settings/TelegramConnectionCard"
 
 export default function SettingsPage() {
@@ -9,12 +10,28 @@ export default function SettingsPage() {
       <PageHeading
         eyebrow="Preferencias"
         title="Configuración"
-        description="Plan anual de Soma y catálogo de personas de reemplazo."
+        description="Calendario, finanzas y notificaciones en un solo lugar."
       />
       <div className="settings-page-content">
-        <SomaAnnualPlanForm />
-        <TelegramConnectionCard />
-        <ReplacementPeopleManager />
+        <section className="settings-category" aria-labelledby="settings-calendar-title">
+          <h2 id="settings-calendar-title">Calendario</h2>
+          <div className="settings-category-content">
+            <SomaAnnualPlanForm />
+            <ReplacementPeopleManager />
+          </div>
+        </section>
+        <section className="settings-category" aria-labelledby="settings-finance-title">
+          <h2 id="settings-finance-title">Finanzas</h2>
+          <div className="settings-category-content">
+            <SocialSecuritySettingsManager />
+          </div>
+        </section>
+        <section className="settings-category" aria-labelledby="settings-notifications-title">
+          <h2 id="settings-notifications-title">Notificaciones</h2>
+          <div className="settings-category-content">
+            <TelegramConnectionCard />
+          </div>
+        </section>
       </div>
     </>
   )

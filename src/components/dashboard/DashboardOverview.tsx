@@ -186,9 +186,6 @@ export function DashboardOverview() {
               <p className="eyebrow">Lo que viene</p>
               <h2>Próximos días</h2>
             </div>
-            <Link aria-label="Agregar actividad" className="small-add-button" href="/calendar?new=1">
-              <Plus size={16} />
-            </Link>
           </div>
           {upcomingEntries.length ? (
             <div className="upcoming-list">

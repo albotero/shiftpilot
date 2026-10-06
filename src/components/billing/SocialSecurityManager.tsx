@@ -1,8 +1,7 @@
 "use client"
 
-import { useEffect, useState, type FormEvent } from "react"
-import { Save } from "lucide-react"
-import type { ArlRiskClass, SocialSecurityConfiguration, SocialSecurityRates } from "@/lib/social-security/calculations"
+import { useEffect, useState } from "react"
+import type { SocialSecurityConfiguration, SocialSecurityRates } from "@/lib/social-security/calculations"
 
 type Period = {
   grossAmount: number
@@ -31,14 +30,10 @@ function formatAmount(amount: number) {
 
 export function SocialSecurityManager({ month, refreshToken }: { month: string; refreshToken: number }) {
   const [result, setResult] = useState<SocialSecurityResponse | null>(null)
-  const [configuration, setConfiguration] = useState<SocialSecurityConfiguration | null>(null)
   const [loadedMonth, setLoadedMonth] = useState("")
   const [loadError, setLoadError] = useState<{ month: string; message: string } | null>(null)
-  const [saving, setSaving] = useState(false)
-  const [error, setError] = useState("")
-  const [message, setMessage] = useState("")
   const loading = loadedMonth !== month
-  const visibleError = error || (loadError?.month === month ? loadError.message : "")
+  const visibleError = loadError?.month === month ? loadError.message : ""
 
   useEffect(() => {
     const controller = new AbortController()
@@ -48,7 +43,6 @@ export function SocialSecurityManager({ month, refreshToken }: { month: string; 
         if (!response.ok) throw new Error(data.error ?? "No se pudo consultar seguridad social.")
         const parsed = data as SocialSecurityResponse
         setResult(parsed)
-        setConfiguration(parsed.configuration)
         setLoadError(null)
         setLoadedMonth(month)
       })
@@ -63,31 +57,6 @@ export function SocialSecurityManager({ month, refreshToken }: { month: string; 
       })
     return () => controller.abort()
   }, [month, refreshToken])
-
-  async function saveConfiguration(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    if (!configuration) return
-    setSaving(true)
-    setError("")
-    setMessage("")
-    try {
-      const response = await fetch("/api/social-security", {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ month, configuration }),
-      })
-      const data = await response.json()
-      if (!response.ok) throw new Error(data.error ?? "No se pudo guardar la configuración.")
-      const saved = data as SocialSecurityResponse
-      setResult(saved)
-      setConfiguration(saved.configuration)
-      setMessage("Configuración guardada y período recalculado.")
-    } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "No se pudo guardar la configuración.")
-    } finally {
-      setSaving(false)
-    }
-  }
 
   const contributions = result
     ? [
@@ -119,6 +88,11 @@ export function SocialSecurityManager({ month, refreshToken }: { month: string; 
         </strong>
       </div>
 
+      {visibleError && (
+        <p className="form-error" role="alert">
+          {visibleError}
+        </p>
+      )}
       {loading ? (
         <p className="invoice-empty">Calculando período…</p>
       ) : result ? (
@@ -169,84 +143,6 @@ export function SocialSecurityManager({ month, refreshToken }: { month: string; 
           </div>
         </>
       ) : null}
-
-      <form className="social-security-rates" onSubmit={saveConfiguration}>
-        <h3>Configuración de aportes</h3>
-        <div className="social-security-rate-grid">
-          <label className="time-toggle social-security-option">
-            <input
-              type="checkbox"
-              checked={configuration?.pensionEnabled ?? false}
-              onChange={(event) =>
-                setConfiguration((current) =>
-                  current ? { ...current, pensionEnabled: event.target.checked } : current,
-                )
-              }
-            />
-            <span>Pago pensión · 16%</span>
-          </label>
-          <label className="time-toggle social-security-option">
-            <input
-              type="checkbox"
-              checked={configuration?.arlEnabled ?? false}
-              onChange={(event) =>
-                setConfiguration((current) => (current ? { ...current, arlEnabled: event.target.checked } : current))
-              }
-            />
-            <span>Pago ARL</span>
-          </label>
-          {configuration?.arlEnabled && (
-            <label className="form-field">
-              <span>Clase de riesgo ARL</span>
-              <select
-                value={configuration.arlRiskClass}
-                onChange={(event) =>
-                  setConfiguration((current) =>
-                    current ? { ...current, arlRiskClass: event.target.value as ArlRiskClass } : current,
-                  )
-                }
-              >
-                <option value="I">I · 0,522%</option>
-                <option value="II">II · 1,044%</option>
-                <option value="III">III · 2,436%</option>
-                <option value="IV">IV · 4,350%</option>
-                <option value="V">V · 6,960%</option>
-              </select>
-            </label>
-          )}
-          <label className="time-toggle social-security-option">
-            <input
-              type="checkbox"
-              checked={configuration?.compensationFundEnabled ?? false}
-              onChange={(event) =>
-                setConfiguration((current) =>
-                  current ? { ...current, compensationFundEnabled: event.target.checked } : current,
-                )
-              }
-            />
-            <span>Pago caja de compensación · 2%</span>
-          </label>
-        </div>
-        <p className="social-security-config-note">
-          IBC: 40% del neto, con piso de un SMMLV. Salud: 12,5%. Caja independiente integral: 2% cuando está activa.
-          Fondo de solidaridad: cálculo automático según IBC y SMMLV, solo si pagas pensión.
-        </p>
-        {visibleError && (
-          <p className="form-error" role="alert">
-            {visibleError}
-          </p>
-        )}
-        {message && (
-          <p className="invoice-message" role="status">
-            {message}
-          </p>
-        )}
-        <div className="invoice-form-actions">
-          <button type="submit" className="submit-button" disabled={saving || loading || !configuration}>
-            <Save size={15} /> {saving ? "Guardando…" : "Guardar configuración"}
-          </button>
-        </div>
-      </form>
     </section>
   )
 }

@@ -9,7 +9,6 @@ import {
   CreditCard,
   LayoutDashboard,
   Menu,
-  Plus,
   Settings2,
   Wallet,
   X,
@@ -131,10 +130,6 @@ export function DashboardShell({ children }: { children: ReactNode }) {
           </div>
           <div className="topbar-right">
             <span className="today-date">{todayLabel}</span>
-            <Link className="quick-add-top" href="/calendar?new=1">
-              <Plus size={16} />
-              <span>Nuevo</span>
-            </Link>
           </div>
         </header>
 
