@@ -464,9 +464,135 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
             </>
           )}
 
+          {kind !== "SOMA" && kind !== "VACACIONES" && (
+            <>
+              <label className="form-field">
+                <span>Título</span>
+                <input
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  maxLength={80}
+                  placeholder={kind === "SEDARTE" ? "Ej. Procedimiento" : "Ej. Cita médica"}
+                />
+              </label>
+              {kind === "SEDARTE" && (
+                <div className="form-row">
+                  <label className="form-field">
+                    <span>Hora inicial</span>
+                    <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
+                  </label>
+                  <label className="form-field">
+                    <span>Duración · horas</span>
+                    <input
+                      type="number"
+                      min="0.25"
+                      max="24"
+                      step="0.25"
+                      value={durationHours}
+                      onChange={(event) => setDurationHours(event.target.value)}
+                    />
+                  </label>
+                </div>
+              )}
+            </>
+          )}
+
+          {kind === "VACACIONES" ? (
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="vacation-start-date">Fecha inicial</label>
+                <DateInput
+                  id="vacation-start-date"
+                  ariaLabel="Fecha inicial"
+                  value={date}
+                  onChange={setDate}
+                  required
+                />
+              </div>
+              <label className="form-field">
+                <span>Semanas completas</span>
+                <input
+                  type="number"
+                  min="1"
+                  step="1"
+                  value={vacationWeeks}
+                  onChange={(event) => {
+                    const weeks = Number(event.target.value)
+                    setVacationWeeks(weeks)
+                  }}
+                  required
+                />
+              </label>
+              <div className="form-field vacation-calculated-end">
+                <label htmlFor="vacation-end-date">Fecha final calculada</label>
+                <DateInput
+                  id="vacation-end-date"
+                  ariaLabel="Fecha final calculada"
+                  value={
+                    date && Number.isInteger(vacationWeeks) && vacationWeeks > 0
+                      ? getVacationEndDate(date, vacationWeeks)
+                      : ""
+                  }
+                  readOnly
+                />
+              </div>
+            </div>
+          ) : (
+            <div className="form-row">
+              <div className="form-field">
+                <label htmlFor="calendar-entry-date">Fecha</label>
+                <DateInput
+                  id="calendar-entry-date"
+                  ariaLabel="Fecha"
+                  value={date}
+                  onChange={setDate}
+                  readOnly={Boolean(initialEntry?.recurrenceId)}
+                  required
+                />
+              </div>
+              {kind !== "SOMA" && (
+                <label className="form-field">
+                  <span>Lugar · opcional</span>
+                  <input
+                    value={location}
+                    onChange={(event) => setLocation(event.target.value)}
+                    maxLength={100}
+                    placeholder="Lugar"
+                  />
+                </label>
+              )}
+            </div>
+          )}
+
+          {kind === "PERSONAL" && (
+            <label className="time-toggle">
+              <input type="checkbox" checked={hasTime} onChange={(event) => setHasTime(event.target.checked)} />
+              <span>Este compromiso tiene horario</span>
+            </label>
+          )}
+          {kind === "PERSONAL" && hasTime && (
+            <div className="form-row">
+              <label className="form-field">
+                <span>Hora inicial</span>
+                <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
+              </label>
+              <label className="form-field">
+                <span>Duración · horas</span>
+                <input
+                  type="number"
+                  min="0.25"
+                  max="24"
+                  step="0.25"
+                  value={durationHours}
+                  onChange={(event) => setDurationHours(event.target.value)}
+                />
+              </label>
+            </div>
+          )}
+
           {(kind === "SOMA" || kind === "PERSONAL") && (
             <>
-              <label className="time-toggle recurrence-option-toggle">
+              <label className="time-toggle">
                 <input
                   type="checkbox"
                   checked={repeatWeekly}
@@ -570,7 +696,7 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
                       />
                     </label>
                   )}
-                  <label className="time-toggle recurrence-option-toggle">
+                  <label className="time-toggle">
                     <input
                       type="checkbox"
                       checked={skipHolidays}
@@ -581,112 +707,6 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
                 </>
               )}
             </>
-          )}
-
-          {kind !== "SOMA" && kind !== "VACACIONES" && (
-            <>
-              <label className="form-field">
-                <span>Título</span>
-                <input
-                  value={title}
-                  onChange={(event) => setTitle(event.target.value)}
-                  maxLength={80}
-                  placeholder={kind === "SEDARTE" ? "Ej. Procedimiento" : "Ej. Cita médica"}
-                />
-              </label>
-              {kind === "PERSONAL" && (
-                <label className="time-toggle">
-                  <input type="checkbox" checked={hasTime} onChange={(event) => setHasTime(event.target.checked)} />
-                  <span>Este compromiso tiene horario</span>
-                </label>
-              )}
-              {(kind === "SEDARTE" || hasTime) && (
-                <div className="form-row">
-                  <label className="form-field">
-                    <span>Hora inicial</span>
-                    <input type="time" value={startTime} onChange={(event) => setStartTime(event.target.value)} />
-                  </label>
-                  <label className="form-field">
-                    <span>Duración · horas</span>
-                    <input
-                      type="number"
-                      min="0.25"
-                      max="24"
-                      step="0.25"
-                      value={durationHours}
-                      onChange={(event) => setDurationHours(event.target.value)}
-                    />
-                  </label>
-                </div>
-              )}
-            </>
-          )}
-
-          {kind === "VACACIONES" ? (
-            <div className="form-row">
-              <div className="form-field">
-                <label htmlFor="vacation-start-date">Fecha inicial</label>
-                <DateInput
-                  id="vacation-start-date"
-                  ariaLabel="Fecha inicial"
-                  value={date}
-                  onChange={setDate}
-                  required
-                />
-              </div>
-              <label className="form-field">
-                <span>Semanas completas</span>
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={vacationWeeks}
-                  onChange={(event) => {
-                    const weeks = Number(event.target.value)
-                    setVacationWeeks(weeks)
-                  }}
-                  required
-                />
-              </label>
-              <div className="form-field vacation-calculated-end">
-                <label htmlFor="vacation-end-date">Fecha final calculada</label>
-                <DateInput
-                  id="vacation-end-date"
-                  ariaLabel="Fecha final calculada"
-                  value={
-                    date && Number.isInteger(vacationWeeks) && vacationWeeks > 0
-                      ? getVacationEndDate(date, vacationWeeks)
-                      : ""
-                  }
-                  readOnly
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="form-row">
-              <div className="form-field">
-                <label htmlFor="calendar-entry-date">Fecha</label>
-                <DateInput
-                  id="calendar-entry-date"
-                  ariaLabel="Fecha"
-                  value={date}
-                  onChange={setDate}
-                  readOnly={Boolean(initialEntry?.recurrenceId)}
-                  required
-                />
-              </div>
-              {kind !== "SOMA" && (
-                <label className="form-field">
-                  <span>Lugar · opcional</span>
-                  <input
-                    value={location}
-                    onChange={(event) => setLocation(event.target.value)}
-                    maxLength={100}
-                    placeholder="Lugar"
-                  />
-                </label>
-              )}
-            </div>
           )}
 
           <label className="form-field">
