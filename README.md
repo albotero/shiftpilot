@@ -119,6 +119,32 @@ docker compose ps
 docker compose logs -f app
 ```
 
+### Recordatorios por Telegram
+
+Los recordatorios están apagados por defecto en cada evento. Al activarlos, el worker de Compose envía el aviso en hora de Colombia y registra cada ocurrencia para evitar reenvíos. En eventos sin hora, "minutos antes" toma las 5:00 a. m. como hora de inicio.
+
+El envío requiere `TELEGRAM_BOT_TOKEN` y `TELEGRAM_BOT_USERNAME` en `.env`; sin ambos valores el worker permanece inactivo y no envía mensajes. El username abre el bot; el chat privado se vincula desde Configuración y ShiftPilot captura su ID automáticamente.
+
+Para usar un bot y chat independientes de otra aplicación:
+
+1. En Telegram abre `@BotFather`, ejecuta `/newbot` y sigue los pasos. Guarda el token y username nuevos; no reutilices el bot/token del otro proyecto.
+2. Define `TELEGRAM_BOT_TOKEN` y `TELEGRAM_BOT_USERNAME` en `.env` del servidor (el username puede ir como `ShiftPilotBot` o `@ShiftPilotBot`). No compartas el token ni lo guardes en Git.
+3. Inicia el worker:
+
+```bash
+docker compose up -d --build telegram-reminders
+```
+
+4. En ShiftPilot, abre Configuración → Telegram para recordatorios, genera el enlace temporal y pulsa **Abrir Telegram y pulsar Iniciar**. El worker recibe `/start`, vincula ese chat privado y guarda su ID; no tienes que consultar ni copiar un `chat_id`.
+
+Si cambias las variables del `.env`, recrea el worker para que cargue la nueva configuración:
+
+```bash
+docker compose up -d --force-recreate telegram-reminders
+```
+
+En cada evento puedes dejar el recordatorio apagado, elegir minutos de anticipación o las 5:00 a. m. del día del evento.
+
 Solo al inicializar una base vacía por primera vez, carga los datos iniciales con:
 
 ```bash

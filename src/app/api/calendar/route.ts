@@ -63,6 +63,9 @@ function mapShift(shift: {
   manualOverride: boolean
   anesthesiologist: string | null
   notes: string | null
+  reminderEnabled: boolean
+  reminderMode: CalendarEntry["reminderMode"]
+  reminderMinutesBefore: number
   coverages?: { person: { id: string; name: string } }[]
 }): CalendarEntry {
   const replacement = shift.coverages?.[0]?.person
@@ -79,6 +82,9 @@ function mapShift(shift: {
         ? { anesthesiologist: shift.anesthesiologist }
         : {}),
     ...(shift.notes ? { notes: shift.notes } : {}),
+    reminderEnabled: shift.reminderEnabled,
+    reminderMode: shift.reminderMode,
+    reminderMinutesBefore: shift.reminderMinutesBefore,
     title: shift.status,
   }
 }
@@ -105,12 +111,18 @@ export async function GET() {
         ...(event.durationMinutes ? { durationHours: event.durationMinutes / 60 } : {}),
         ...(event.location ? { location: event.location } : {}),
         ...(event.notes ? { notes: event.notes } : {}),
+        reminderEnabled: event.reminderEnabled,
+        reminderMode: event.reminderMode,
+        reminderMinutesBefore: event.reminderMinutesBefore,
       })),
       ...vacations.map((vacation) => ({
         id: vacation.id,
         date: dateKey(vacation.startDate),
         ...(vacation.endDate ? { endDate: dateKey(vacation.endDate) } : {}),
         ...(vacation.annualPlanYear ? { annualPlanYear: vacation.annualPlanYear } : {}),
+        reminderEnabled: vacation.reminderEnabled,
+        reminderMode: vacation.reminderMode,
+        reminderMinutesBefore: vacation.reminderMinutesBefore,
         kind: "VACACIONES" as const,
         title: "VACACIONES",
         ...(vacation.notes ? { notes: vacation.notes } : {}),
@@ -194,6 +206,9 @@ export async function POST(request: Request) {
             manualOverride: !entry.restoreAutomatic,
             anesthesiologist: entry.restoreAutomatic ? null : replacement?.name || entry.anesthesiologist || null,
             notes: entry.notes || null,
+            reminderEnabled: entry.reminderEnabled,
+            reminderMode: entry.reminderMode,
+            reminderMinutesBefore: entry.reminderMinutesBefore,
           }
           const coverageWrite = {
             coverages: {
@@ -230,6 +245,9 @@ export async function POST(request: Request) {
           startDate: new Date(`${entry.date}T00:00:00.000Z`),
           endDate: new Date(`${entry.endDate ?? entry.date}T00:00:00.000Z`),
           notes: entry.notes,
+          reminderEnabled: entry.reminderEnabled,
+          reminderMode: entry.reminderMode,
+          reminderMinutesBefore: entry.reminderMinutesBefore,
         },
       })
       return Response.json(
@@ -241,6 +259,9 @@ export async function POST(request: Request) {
             kind: "VACACIONES",
             title: "VACACIONES",
             ...(vacation.notes ? { notes: vacation.notes } : {}),
+            reminderEnabled: vacation.reminderEnabled,
+            reminderMode: vacation.reminderMode,
+            reminderMinutesBefore: vacation.reminderMinutesBefore,
           },
         ],
         { status: 201 },
@@ -263,6 +284,9 @@ export async function POST(request: Request) {
         durationMinutes: entry.durationHours ? Math.round(entry.durationHours * 60) : null,
         location: entry.location,
         notes: entry.notes,
+        reminderEnabled: entry.reminderEnabled,
+        reminderMode: entry.reminderMode,
+        reminderMinutesBefore: entry.reminderMinutesBefore,
       },
     })
 
@@ -277,6 +301,9 @@ export async function POST(request: Request) {
           ...(event.durationMinutes ? { durationHours: event.durationMinutes / 60 } : {}),
           ...(event.location ? { location: event.location } : {}),
           ...(event.notes ? { notes: event.notes } : {}),
+          reminderEnabled: event.reminderEnabled,
+          reminderMode: event.reminderMode,
+          reminderMinutesBefore: event.reminderMinutesBefore,
         },
       ],
       { status: 201 },
@@ -394,6 +421,9 @@ export async function PATCH(request: Request) {
       const updateData = {
         date: targetDate,
         notes: parsed.data.notes || null,
+        reminderEnabled: parsed.data.reminderEnabled,
+        reminderMode: parsed.data.reminderMode,
+        reminderMinutesBefore: parsed.data.reminderMinutesBefore,
       }
       const updatedShifts = await prisma.$transaction(
         requestedPeriods.map((period) => {
@@ -459,6 +489,9 @@ export async function PATCH(request: Request) {
           startDate: new Date(`${parsed.data.date}T00:00:00.000Z`),
           endDate: new Date(`${parsed.data.endDate ?? parsed.data.date}T00:00:00.000Z`),
           notes: parsed.data.notes,
+          reminderEnabled: parsed.data.reminderEnabled,
+          reminderMode: parsed.data.reminderMode,
+          reminderMinutesBefore: parsed.data.reminderMinutesBefore,
         },
       })
       return Response.json([
@@ -469,6 +502,9 @@ export async function PATCH(request: Request) {
           kind: "VACACIONES",
           title: "VACACIONES",
           ...(vacation.notes ? { notes: vacation.notes } : {}),
+          reminderEnabled: vacation.reminderEnabled,
+          reminderMode: vacation.reminderMode,
+          reminderMinutesBefore: vacation.reminderMinutesBefore,
         },
       ])
     }
@@ -493,6 +529,9 @@ export async function PATCH(request: Request) {
         durationMinutes: parsed.data.durationHours ? Math.round(parsed.data.durationHours * 60) : null,
         location: parsed.data.location ?? null,
         notes: parsed.data.notes ?? null,
+        reminderEnabled: parsed.data.reminderEnabled,
+        reminderMode: parsed.data.reminderMode,
+        reminderMinutesBefore: parsed.data.reminderMinutesBefore,
       },
     })
     return Response.json([
@@ -505,6 +544,9 @@ export async function PATCH(request: Request) {
         ...(event.durationMinutes ? { durationHours: event.durationMinutes / 60 } : {}),
         ...(event.location ? { location: event.location } : {}),
         ...(event.notes ? { notes: event.notes } : {}),
+        reminderEnabled: event.reminderEnabled,
+        reminderMode: event.reminderMode,
+        reminderMinutesBefore: event.reminderMinutesBefore,
       },
     ])
   } catch (error) {

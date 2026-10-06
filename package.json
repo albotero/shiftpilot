@@ -15,7 +15,8 @@
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "reminders:run": "tsx src/workers/telegram-reminders.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

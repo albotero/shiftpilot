@@ -132,7 +132,27 @@ describe("weekly calendar recurrence expansion", () => {
       "2026-10-03",
       "2026-10-12",
     )
-
     expect(entries.map((entry) => entry.date)).toEqual(["2026-10-03", "2026-10-06", "2026-10-09", "2026-10-12"])
+  })
+
+  it("inherits reminder settings and allows an occurrence exception to disable them", () => {
+    const entries = expandWeeklyRecurrence(
+      {
+        ...saturdayRule,
+        endDate: null,
+        reminderEnabled: true,
+        reminderMode: "MINUTES_BEFORE",
+        reminderMinutesBefore: 45,
+      },
+      "2026-10-03",
+      "2026-10-17",
+      [{ date: "2026-10-10", title: "Cita personal", reminderEnabled: false }],
+    )
+
+    expect(entries.map((entry) => [entry.date, entry.reminderEnabled, entry.reminderMinutesBefore])).toEqual([
+      ["2026-10-03", true, 45],
+      ["2026-10-10", false, 45],
+      ["2026-10-17", true, 45],
+    ])
   })
 })

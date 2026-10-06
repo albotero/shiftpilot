@@ -1,6 +1,7 @@
 import { ReplacementPeopleManager } from "@/components/calendar/ReplacementPeopleManager"
 import { SomaAnnualPlanForm } from "@/components/calendar/SomaAnnualPlanForm"
 import { PageHeading } from "@/components/dashboard/PageHeading"
+import { TelegramConnectionCard } from "@/components/settings/TelegramConnectionCard"
 
 export default function SettingsPage() {
   return (
@@ -12,6 +13,7 @@ export default function SettingsPage() {
       />
       <div className="settings-page-content">
         <SomaAnnualPlanForm />
+        <TelegramConnectionCard />
         <ReplacementPeopleManager />
       </div>
     </>

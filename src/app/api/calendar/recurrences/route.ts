@@ -29,6 +29,9 @@ const recurrenceSchema = z
     status: z.enum(["R4", "R3", "R2", "R1", "R5", "TURNO", "NOCHE", "EXTERNO", "EXTERNO_NOCHE"]).optional(),
     recurrencePeriod: z.enum(["AM", "PM", "AM_PM", "NOCHE"]).optional(),
     recurrenceEditScope: z.enum(["OCCURRENCE", "THIS_AND_FUTURE"]).default("THIS_AND_FUTURE"),
+    reminderEnabled: z.boolean().default(false),
+    reminderMode: z.enum(["MINUTES_BEFORE", "DAY_AT_5_AM"]).default("MINUTES_BEFORE"),
+    reminderMinutesBefore: z.number().int().min(1).max(10080).default(60),
     title: z.string().trim().min(1).max(80),
     startTime: z
       .string()
@@ -116,6 +119,9 @@ function mapRule(rule: {
   durationMinutes: number | null
   location: string | null
   notes: string | null
+  reminderEnabled: boolean
+  reminderMode: string
+  reminderMinutesBefore: number
 }): CalendarRecurringRule {
   return {
     id: rule.id,
@@ -136,6 +142,9 @@ function mapRule(rule: {
     ...(rule.durationMinutes ? { durationMinutes: rule.durationMinutes } : {}),
     ...(rule.location ? { location: rule.location } : {}),
     ...(rule.notes ? { notes: rule.notes } : {}),
+    reminderEnabled: rule.reminderEnabled,
+    reminderMode: rule.reminderMode as CalendarRecurringRule["reminderMode"],
+    reminderMinutesBefore: rule.reminderMinutesBefore,
   }
 }
 
@@ -148,6 +157,9 @@ function mapOverride(exception: {
   durationMinutes: number | null
   location: string | null
   notes: string | null
+  reminderEnabled: boolean
+  reminderMode: string
+  reminderMinutesBefore: number
 }): WeeklyRecurrenceOverride {
   return {
     date: exception.date.toISOString().slice(0, 10),
@@ -158,6 +170,9 @@ function mapOverride(exception: {
     durationMinutes: exception.durationMinutes,
     location: exception.location,
     notes: exception.notes,
+    reminderEnabled: exception.reminderEnabled,
+    reminderMode: exception.reminderMode as WeeklyRecurrenceOverride["reminderMode"],
+    reminderMinutesBefore: exception.reminderMinutesBefore,
   }
 }
 
@@ -196,6 +211,9 @@ function recurrenceData(
     durationMinutes: rule.kind === "PERSONAL" && rule.durationHours ? Math.round(rule.durationHours * 60) : null,
     location: rule.location || null,
     notes: rule.notes || null,
+    reminderEnabled: rule.reminderEnabled,
+    reminderMode: rule.reminderMode,
+    reminderMinutesBefore: rule.reminderMinutesBefore,
   }
 }
 
@@ -210,6 +228,9 @@ function recurrenceOverrideData(rule: z.infer<typeof recurrenceSchema>) {
     durationMinutes: rule.kind === "PERSONAL" && rule.durationHours ? Math.round(rule.durationHours * 60) : null,
     location: rule.location || null,
     notes: rule.notes || null,
+    reminderEnabled: rule.reminderEnabled,
+    reminderMode: rule.reminderMode,
+    reminderMinutesBefore: rule.reminderMinutesBefore,
   }
 }
 

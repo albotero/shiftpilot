@@ -18,6 +18,9 @@ export const calendarEntrySchema = z.object({
   skipHolidays: z.boolean().optional(),
   recurrenceEditScope: z.enum(["OCCURRENCE", "THIS_AND_FUTURE"]).optional(),
   recurrenceDeleteScope: z.enum(["ALL", "FUTURE"]).optional(),
+  reminderEnabled: z.boolean().optional(),
+  reminderMode: z.enum(["MINUTES_BEFORE", "DAY_AT_5_AM"]).optional(),
+  reminderMinutesBefore: z.number().int().min(1).max(10080).optional(),
   kind: z.enum(["SOMA", "SEDARTE", "PERSONAL", "VACACIONES"]),
   status: z
     .enum([

@@ -51,6 +51,11 @@ enum RecurringEntryKind {
   PERSONAL
 }
 
+enum CalendarReminderMode {
+  MINUTES_BEFORE
+  DAY_AT_5_AM
+}
+
 enum InvoiceType {
   SOMA_POS
   SOMA_PREPAGADA
@@ -88,6 +93,9 @@ model Shift {
   manualOverride Boolean          @default(false)
   anesthesiologist String?
   notes          String?
+  reminderEnabled Boolean         @default(false)
+  reminderMode   CalendarReminderMode @default(MINUTES_BEFORE)
+  reminderMinutesBefore Int       @default(60)
   coverages      ShiftCoverage[]
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
@@ -126,6 +134,9 @@ model Vacation {
   endDate        DateTime? @db.Date
   notes          String?
   annualPlanYear Int?     @unique
+  reminderEnabled Boolean @default(false)
+  reminderMode   CalendarReminderMode @default(MINUTES_BEFORE)
+  reminderMinutesBefore Int @default(60)
   createdAt      DateTime @default(now())
 
   @@index([startDate, endDate])
@@ -142,6 +153,9 @@ model Event {
   durationMinutes Int?
   location       String?
   notes          String?
+  reminderEnabled Boolean        @default(false)
+  reminderMode   CalendarReminderMode @default(MINUTES_BEFORE)
+  reminderMinutesBefore Int      @default(60)
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
@@ -169,6 +183,9 @@ model CalendarRecurrence {
   durationMinutes Int?
   location        String?
   notes           String?
+  reminderEnabled Boolean             @default(false)
+  reminderMode    CalendarReminderMode @default(MINUTES_BEFORE)
+  reminderMinutesBefore Int            @default(60)
   exceptions      CalendarRecurrenceException[]
   createdAt       DateTime            @default(now())
   updatedAt       DateTime            @updatedAt
@@ -189,11 +206,28 @@ model CalendarRecurrenceException {
   durationMinutes Int?
   location        String?
   notes           String?
+  reminderEnabled Boolean             @default(false)
+  reminderMode    CalendarReminderMode @default(MINUTES_BEFORE)
+  reminderMinutesBefore Int            @default(60)
   createdAt       DateTime           @default(now())
   updatedAt       DateTime           @updatedAt
 
   @@unique([recurrenceId, date])
   @@index([date])
+}
+
+model CalendarReminderDelivery {
+  id           String   @id @default(cuid())
+  eventKey     String   @unique
+  dueAt        DateTime
+  sentAt       DateTime?
+  claimedUntil DateTime?
+  attempts     Int      @default(0)
+  lastError    String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([dueAt, sentAt])
 }
 
 model Invoice {

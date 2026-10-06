@@ -7,7 +7,13 @@ import { DateInput } from "@/components/forms/DateInput"
 import { calendarEntrySchema } from "@/lib/calendar/schema"
 import { toDateKey } from "@/lib/calendar/utils"
 import { getVacationEndDate, getVacationWeekCount } from "@/lib/calendar/vacation-weeks"
-import type { CalendarEntry, CalendarEntryKind, ShiftPeriod, SomaStatus } from "@/lib/calendar/types"
+import type {
+  CalendarEntry,
+  CalendarEntryKind,
+  CalendarReminderMode,
+  ShiftPeriod,
+  SomaStatus,
+} from "@/lib/calendar/types"
 
 type QuickAddDialogProps = {
   initialDate: Date
@@ -90,6 +96,9 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
   const [startTime, setStartTime] = useState(initialEntry?.startTime ?? "08:00")
   const [durationHours, setDurationHours] = useState(String(initialEntry?.durationHours ?? 2))
   const [hasTime, setHasTime] = useState(initialEntry?.kind === "SEDARTE" || Boolean(initialEntry?.startTime))
+  const [reminderEnabled, setReminderEnabled] = useState(Boolean(initialEntry?.reminderEnabled))
+  const [reminderMode, setReminderMode] = useState<CalendarReminderMode>(initialEntry?.reminderMode ?? "MINUTES_BEFORE")
+  const [reminderMinutesBefore, setReminderMinutesBefore] = useState(initialEntry?.reminderMinutesBefore ?? 60)
   const [location, setLocation] = useState(initialEntry?.location ?? "")
   const [notes, setNotes] = useState(initialEntry?.notes ?? "")
   const [replacementPersonId, setReplacementPersonId] = useState(initialEntry?.replacementPersonId ?? "")
@@ -181,6 +190,14 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
       setError("Indica cada cuántos días debe repetirse.")
       return
     }
+    if (
+      reminderEnabled &&
+      reminderMode === "MINUTES_BEFORE" &&
+      (!Number.isInteger(reminderMinutesBefore) || reminderMinutesBefore < 1 || reminderMinutesBefore > 10080)
+    ) {
+      setError("Indica entre 1 y 10.080 minutos de anticipación.")
+      return
+    }
 
     let vacationEndDate: string | undefined
     if (kind === "VACACIONES") {
@@ -196,6 +213,9 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
     const entry = {
       id: initialEntry?.id ?? createEntryId(),
       date,
+      reminderEnabled,
+      reminderMode,
+      reminderMinutesBefore,
       ...(shouldRepeatWeekly
         ? {
             repeatWeekly: true,
@@ -587,6 +607,43 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
                   onChange={(event) => setDurationHours(event.target.value)}
                 />
               </label>
+            </div>
+          )}
+
+          <label className="time-toggle">
+            <input
+              type="checkbox"
+              checked={reminderEnabled}
+              onChange={(event) => setReminderEnabled(event.target.checked)}
+            />
+            <span>Recordatorio por Telegram</span>
+          </label>
+          {reminderEnabled && (
+            <div className="form-row">
+              <label className="form-field">
+                <span>Enviar</span>
+                <select
+                  value={reminderMode}
+                  onChange={(event) => setReminderMode(event.target.value as CalendarReminderMode)}
+                >
+                  <option value="MINUTES_BEFORE">Minutos antes del evento</option>
+                  <option value="DAY_AT_5_AM">El día del evento a las 5:00 a. m.</option>
+                </select>
+              </label>
+              {reminderMode === "MINUTES_BEFORE" && (
+                <label className="form-field">
+                  <span>Anticipación · minutos</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10080"
+                    step="1"
+                    value={reminderMinutesBefore}
+                    onChange={(event) => setReminderMinutesBefore(Number(event.target.value))}
+                    required
+                  />
+                </label>
+              )}
             </div>
           )}
 

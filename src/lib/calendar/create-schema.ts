@@ -18,6 +18,9 @@ export const createCalendarEntrySchema = z
     recurrenceIntervalDays: z.number().int().min(1).max(3650).optional(),
     recurrencePeriod: z.enum(["AM", "PM", "AM_PM", "NOCHE"]).optional(),
     skipHolidays: z.boolean().optional(),
+    reminderEnabled: z.boolean().default(false),
+    reminderMode: z.enum(["MINUTES_BEFORE", "DAY_AT_5_AM"]).default("MINUTES_BEFORE"),
+    reminderMinutesBefore: z.number().int().min(1).max(10080).default(60),
     kind: z.enum(["SOMA", "SEDARTE", "PERSONAL", "VACACIONES"]),
     status: z
       .enum([

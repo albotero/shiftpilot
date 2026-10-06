@@ -22,6 +22,9 @@ export type CalendarRecurringRule = {
   durationMinutes?: number | null
   location?: string | null
   notes?: string | null
+  reminderEnabled?: boolean
+  reminderMode?: CalendarEntry["reminderMode"]
+  reminderMinutesBefore?: number
 }
 
 export type WeeklyRecurrenceOverride = {
@@ -33,6 +36,9 @@ export type WeeklyRecurrenceOverride = {
   durationMinutes?: number | null
   location?: string | null
   notes?: string | null
+  reminderEnabled?: boolean | null
+  reminderMode?: CalendarEntry["reminderMode"] | null
+  reminderMinutesBefore?: number | null
 }
 
 function parseDateKey(dateKey: string) {
@@ -104,6 +110,9 @@ export function expandCalendarRecurrence(
       const durationMinutes = override ? override.durationMinutes : rule.durationMinutes
       const location = override ? override.location : rule.location
       const notes = override ? override.notes : rule.notes
+      const reminderEnabled = override?.reminderEnabled ?? rule.reminderEnabled ?? false
+      const reminderMode = override?.reminderMode ?? rule.reminderMode ?? "MINUTES_BEFORE"
+      const reminderMinutesBefore = override?.reminderMinutesBefore ?? rule.reminderMinutesBefore ?? 60
       const periods: (NonNullable<CalendarEntry["period"]> | undefined)[] =
         rule.kind !== "SOMA" ? [undefined] : recurrencePeriod === "AM_PM" ? ["AM", "PM"] : [recurrencePeriod ?? "AM"]
       for (const period of periods) {
@@ -122,6 +131,9 @@ export function expandCalendarRecurrence(
           skipHolidays: rule.skipHolidays,
           date,
           kind: rule.kind,
+          reminderEnabled,
+          reminderMode,
+          reminderMinutesBefore,
           ...(rule.kind === "SOMA" ? { status, period, manualOverride: true } : {}),
           title,
           ...(startTime ? { startTime } : {}),

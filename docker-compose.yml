@@ -23,8 +23,26 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-shiftpilot}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the .env file}@db:5432/${POSTGRES_DB:-shiftpilot}?schema=public
       NODE_ENV: production
+      TELEGRAM_BOT_CONFIGURED: ${TELEGRAM_BOT_TOKEN:+true}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
     ports:
       - "${SHIFTPILOT_BIND_ADDRESS:-127.0.0.1}:3000:3000"
+
+  telegram-reminders:
+    image: shiftpilot-app
+    build: .
+    restart: unless-stopped
+    init: true
+    stop_grace_period: 35s
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-shiftpilot}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in the .env file}@db:5432/${POSTGRES_DB:-shiftpilot}?schema=public
+      NODE_ENV: production
+      TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN:-}
+      TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
+    command: ["sh", "-c", "npm run db:deploy && npm run reminders:run"]
 
 volumes:
   shiftpilot-postgres:

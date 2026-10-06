@@ -103,6 +103,8 @@ describe("weekly calendar recurrence routes", () => {
         recurrenceWeekday: 6,
         recurrenceEndDate: null,
         skipHolidays: true,
+        reminderEnabled: true,
+        reminderMode: "DAY_AT_5_AM",
         title: "Cita personal",
       }),
     )
@@ -118,6 +120,9 @@ describe("weekly calendar recurrence routes", () => {
         weekday: 6,
         weekdays: [6],
         skipHolidays: true,
+        reminderEnabled: true,
+        reminderMode: "DAY_AT_5_AM",
+        reminderMinutesBefore: 60,
         title: "Cita personal",
       }),
     })
@@ -198,6 +203,8 @@ describe("weekly calendar recurrence routes", () => {
         kind: "PERSONAL",
         repeatWeekly: true,
         recurrenceWeekdays: [6],
+        reminderEnabled: true,
+        reminderMode: "DAY_AT_5_AM",
         title: "Cita distinta",
       }),
     )
@@ -205,8 +212,13 @@ describe("weekly calendar recurrence routes", () => {
     expect(response.status).toBe(200)
     expect(prismaMock.calendarRecurrenceException.upsert).toHaveBeenCalledWith({
       where: { recurrenceId_date: { recurrenceId: "recurrence-1", date: new Date("2026-10-10T00:00:00.000Z") } },
-      create: expect.objectContaining({ recurrenceId: "recurrence-1", date: new Date("2026-10-10T00:00:00.000Z") }),
-      update: expect.objectContaining({ title: "Cita distinta" }),
+      create: expect.objectContaining({
+        recurrenceId: "recurrence-1",
+        date: new Date("2026-10-10T00:00:00.000Z"),
+        reminderEnabled: true,
+        reminderMode: "DAY_AT_5_AM",
+      }),
+      update: expect.objectContaining({ title: "Cita distinta", reminderEnabled: true }),
     })
     expect(prismaMock.calendarRecurrence.update).not.toHaveBeenCalled()
   })

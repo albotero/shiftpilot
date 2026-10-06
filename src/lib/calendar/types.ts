@@ -17,6 +17,7 @@ export type SomaStatus =
   | "EXTERNO_NOCHE"
 
 export type ShiftPeriod = "AM" | "PM" | "AM + PM" | "NOCHE"
+export type CalendarReminderMode = "MINUTES_BEFORE" | "DAY_AT_5_AM"
 
 export type CalendarEntry = {
   id: string
@@ -51,6 +52,9 @@ export type CalendarEntry = {
   skipHolidays?: boolean
   recurrenceEditScope?: "OCCURRENCE" | "THIS_AND_FUTURE"
   recurrenceDeleteScope?: "ALL" | "FUTURE"
+  reminderEnabled?: boolean
+  reminderMode?: CalendarReminderMode
+  reminderMinutesBefore?: number
 }
 
 export type EntryFilters = Record<CalendarEntryKind, boolean>

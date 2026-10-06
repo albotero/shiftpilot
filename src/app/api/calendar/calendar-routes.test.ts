@@ -634,6 +634,9 @@ describe("Vacation calendar routes", () => {
         startDate: vacation.startDate,
         endDate: vacation.endDate,
         notes: "Descanso",
+        reminderEnabled: false,
+        reminderMode: "MINUTES_BEFORE",
+        reminderMinutesBefore: 60,
       },
     })
   })
@@ -707,6 +710,9 @@ describe("Vacation calendar routes", () => {
         startDate: new Date("2026-10-14T00:00:00.000Z"),
         endDate: new Date("2026-10-27T00:00:00.000Z"),
         notes: "Fechas nuevas",
+        reminderEnabled: false,
+        reminderMode: "MINUTES_BEFORE",
+        reminderMinutesBefore: 60,
       },
     })
   })
@@ -772,7 +778,12 @@ describe("Sedarte calendar routes", () => {
 
   it("creates a timed Sedarte event with title, location, notes, and rounded minutes", async () => {
     prismaMock.work.findUnique.mockResolvedValue(sedarteWork)
-    prismaMock.event.create.mockResolvedValue(sedarteEvent)
+    prismaMock.event.create.mockResolvedValue({
+      ...sedarteEvent,
+      reminderEnabled: true,
+      reminderMode: "MINUTES_BEFORE",
+      reminderMinutesBefore: 45,
+    })
 
     const response = await POST(
       jsonRequest({
@@ -784,6 +795,9 @@ describe("Sedarte calendar routes", () => {
         durationHours: 1.25,
         location: "Quirófano 2",
         notes: "Confirmar equipo",
+        reminderEnabled: true,
+        reminderMode: "MINUTES_BEFORE",
+        reminderMinutesBefore: 45,
       }),
     )
 
@@ -808,6 +822,9 @@ describe("Sedarte calendar routes", () => {
         durationMinutes: 75,
         location: "Quirófano 2",
         notes: "Confirmar equipo",
+        reminderEnabled: true,
+        reminderMode: "MINUTES_BEFORE",
+        reminderMinutesBefore: 45,
       },
     })
   })
@@ -865,6 +882,9 @@ describe("Sedarte calendar routes", () => {
         durationMinutes: 90,
         location: "Sala 3",
         notes: "Confirmar equipo",
+        reminderEnabled: false,
+        reminderMode: "MINUTES_BEFORE",
+        reminderMinutesBefore: 60,
       },
     })
   })
