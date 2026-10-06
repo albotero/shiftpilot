@@ -37,6 +37,20 @@ export type CalendarEntry = {
   durationHours?: number
   location?: string
   notes?: string
+  recurrenceId?: string
+  repeatWeekly?: boolean
+  recurrenceStartDate?: string
+  recurrenceEndDate?: string | null
+  recurrenceWeekday?: number
+  recurrenceFrequency?: "WEEKLY" | "MONTHLY" | "INTERVAL"
+  recurrenceWeekdays?: number[]
+  recurrenceDayOfMonth?: number
+  recurrenceLastDayOfMonth?: boolean
+  recurrenceIntervalDays?: number
+  recurrencePeriod?: "AM" | "PM" | "AM_PM" | "NOCHE"
+  skipHolidays?: boolean
+  recurrenceEditScope?: "OCCURRENCE" | "THIS_AND_FUTURE"
+  recurrenceDeleteScope?: "ALL" | "FUTURE"
 }
 
 export type EntryFilters = Record<CalendarEntryKind, boolean>

@@ -12,6 +12,7 @@ import {
   getVisibleDays,
   toDateKey,
 } from "@/lib/calendar/utils"
+import { expandWeeklyRecurrence } from "@/lib/calendar/recurrence"
 import type { CalendarEntry, ShiftPeriod } from "@/lib/calendar/types"
 import { prisma } from "@/server/db"
 
@@ -69,7 +70,7 @@ export default async function SharedMonthPage({ params }: PageProps) {
   const visibleDays = getVisibleDays(monthDate, "month")
   const rangeStart = new Date(`${toDateKey(visibleDays[0])}T00:00:00.000Z`)
   const rangeEnd = new Date(`${toDateKey(visibleDays[visibleDays.length - 1])}T00:00:00.000Z`)
-  const [shifts, events, vacations] = await Promise.all([
+  const [shifts, events, vacations, recurrences] = await Promise.all([
     prisma.shift.findMany({
       where: { date: { gte: rangeStart, lte: rangeEnd } },
       include: { coverages: { include: { person: true } } },
@@ -85,6 +86,14 @@ export default async function SharedMonthPage({ params }: PageProps) {
         OR: [{ endDate: { gte: rangeStart } }, { endDate: null }],
       },
       orderBy: { startDate: "asc" },
+    }),
+    prisma.calendarRecurrence.findMany({
+      where: {
+        startDate: { lte: rangeEnd },
+        OR: [{ endDate: null }, { endDate: { gte: rangeStart } }],
+      },
+      include: { exceptions: { where: { date: { gte: rangeStart, lte: rangeEnd } } } },
+      orderBy: [{ startDate: "asc" }, { createdAt: "asc" }],
     }),
   ])
 
@@ -109,6 +118,42 @@ export default async function SharedMonthPage({ params }: PageProps) {
       title: "VACACIONES",
       ...(vacation.notes ? { notes: vacation.notes } : {}),
     })),
+    ...recurrences.flatMap((rule) =>
+      expandWeeklyRecurrence(
+        {
+          id: rule.id,
+          kind: rule.kind,
+          frequency: rule.frequency,
+          startDate: dateKey(rule.startDate),
+          endDate: rule.endDate ? dateKey(rule.endDate) : null,
+          weekday: rule.weekday ?? undefined,
+          weekdays: rule.weekdays,
+          dayOfMonth: rule.dayOfMonth,
+          lastDayOfMonth: rule.lastDayOfMonth,
+          intervalDays: rule.intervalDays,
+          skipHolidays: rule.skipHolidays,
+          title: rule.title,
+          ...(rule.status ? { status: rule.status as CalendarEntry["status"] } : {}),
+          ...(rule.period ? { period: rule.period } : {}),
+          ...(rule.startTime ? { startTime: rule.startTime } : {}),
+          ...(rule.durationMinutes ? { durationMinutes: rule.durationMinutes } : {}),
+          ...(rule.location ? { location: rule.location } : {}),
+          ...(rule.notes ? { notes: rule.notes } : {}),
+        },
+        dateKey(visibleDays[0]),
+        dateKey(visibleDays[visibleDays.length - 1]),
+        rule.exceptions.map((exception) => ({
+          date: dateKey(exception.date),
+          title: exception.title,
+          status: exception.status,
+          period: exception.period,
+          startTime: exception.startTime,
+          durationMinutes: exception.durationMinutes,
+          location: exception.location,
+          notes: exception.notes,
+        })),
+      ),
+    ),
   ]
 
   const previousMonth = subMonths(monthDate, 1)

@@ -124,6 +124,38 @@ export async function addCalendarEntry(entry: CalendarEntry) {
   setStorageMode("database")
 }
 
+export async function saveCalendarRecurrence(entry: CalendarEntry) {
+  const recurrencePeriod =
+    entry.recurrencePeriod ??
+    (entry.period === "AM + PM"
+      ? "AM_PM"
+      : entry.period === "AM" || entry.period === "PM" || entry.period === "NOCHE"
+        ? entry.period
+        : undefined)
+  const body = {
+    ...entry,
+    date: entry.date,
+    repeatWeekly: true,
+    recurrenceEndDate: entry.recurrenceEndDate ?? null,
+    ...(recurrencePeriod ? { recurrencePeriod } : {}),
+  }
+  let response: Response
+  try {
+    response = await fetch("/api/calendar/recurrences", {
+      method: entry.recurrenceId ? "PATCH" : "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    })
+  } catch {
+    throw new Error("No se pudo conectar con PostgreSQL; la serie no se guardó.")
+  }
+  const result = (await response.json().catch(() => null)) as { id?: string; error?: string } | null
+  if (!response.ok || !result?.id) {
+    throw new Error(result?.error ?? "No se pudo guardar la serie semanal.")
+  }
+  setStorageMode("database")
+}
+
 export async function updateCalendarEntry(entry: CalendarEntry) {
   if (storageMode === "browser") {
     cacheEntries(getCalendarEntries().map((current) => (current.id === entry.id ? entry : current)))
@@ -161,6 +193,27 @@ export async function updateCalendarEntry(entry: CalendarEntry) {
 }
 
 export async function deleteCalendarEntry(entry: CalendarEntry) {
+  if (entry.recurrenceId) {
+    let response: Response
+    try {
+      response = await fetch("/api/calendar/recurrences", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: entry.recurrenceId,
+          scope: entry.recurrenceDeleteScope ?? "ALL",
+          date: entry.date,
+        }),
+      })
+    } catch {
+      throw new Error("No se pudo conectar con PostgreSQL; la serie no se eliminó.")
+    }
+    const result = (await response.json().catch(() => null)) as { error?: string } | null
+    if (!response.ok) throw new Error(result?.error ?? "No se pudo eliminar la serie semanal.")
+    setStorageMode("database")
+    return
+  }
+
   if (storageMode === "browser") {
     if (entry.kind === "SOMA") throw new Error("Restaurar la rotación requiere conexión a PostgreSQL.")
     cacheEntries(getCalendarEntries().filter((current) => current.id !== entry.id))

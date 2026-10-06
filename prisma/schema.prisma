@@ -28,8 +28,26 @@ enum ShiftPeriod {
   NOCHE
 }
 
+enum RecurrencePeriod {
+  AM
+  PM
+  AM_PM
+  NOCHE
+}
+
+enum RecurrenceFrequency {
+  WEEKLY
+  MONTHLY
+  INTERVAL
+}
+
 enum EventCategory {
   SEDARTE
+  PERSONAL
+}
+
+enum RecurringEntryKind {
+  SOMA
   PERSONAL
 }
 
@@ -53,6 +71,7 @@ model Work {
   name     String    @unique
   shifts   Shift[]
   events   Event[]
+  recurrences CalendarRecurrence[]
   invoices Invoice[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -127,6 +146,54 @@ model Event {
   updatedAt      DateTime       @updatedAt
 
   @@index([date, category])
+}
+
+model CalendarRecurrence {
+  id              String              @id @default(cuid())
+  workId          String?
+  work            Work?               @relation(fields: [workId], references: [id], onDelete: SetNull)
+  kind            RecurringEntryKind
+  frequency       RecurrenceFrequency @default(WEEKLY)
+  startDate       DateTime            @db.Date
+  endDate         DateTime?           @db.Date
+  weekday         Int?
+  weekdays        Int[]               @default([])
+  dayOfMonth      Int?
+  lastDayOfMonth  Boolean             @default(false)
+  intervalDays    Int?
+  skipHolidays    Boolean             @default(false)
+  title           String
+  status          SomaShiftStatus?
+  period          RecurrencePeriod?
+  startTime       String?
+  durationMinutes Int?
+  location        String?
+  notes           String?
+  exceptions      CalendarRecurrenceException[]
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([startDate, endDate])
+  @@index([kind, weekday])
+}
+
+model CalendarRecurrenceException {
+  id              String             @id @default(cuid())
+  recurrenceId    String
+  recurrence      CalendarRecurrence @relation(fields: [recurrenceId], references: [id], onDelete: Cascade)
+  date            DateTime           @db.Date
+  title           String
+  status          SomaShiftStatus?
+  period          RecurrencePeriod?
+  startTime       String?
+  durationMinutes Int?
+  location        String?
+  notes           String?
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  @@unique([recurrenceId, date])
+  @@index([date])
 }
 
 model Invoice {

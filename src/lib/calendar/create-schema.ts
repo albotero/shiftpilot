@@ -6,6 +6,18 @@ export const createCalendarEntrySchema = z
     id: z.string().min(1),
     date: z.iso.date(),
     endDate: z.iso.date().optional(),
+    recurrenceId: z.string().min(1).optional(),
+    repeatWeekly: z.boolean().optional(),
+    recurrenceStartDate: z.iso.date().optional(),
+    recurrenceEndDate: z.union([z.iso.date(), z.null()]).optional(),
+    recurrenceWeekday: z.number().int().min(0).max(6).optional(),
+    recurrenceFrequency: z.enum(["WEEKLY", "MONTHLY", "INTERVAL"]).optional(),
+    recurrenceWeekdays: z.array(z.number().int().min(0).max(6)).optional(),
+    recurrenceDayOfMonth: z.number().int().min(1).max(31).optional(),
+    recurrenceLastDayOfMonth: z.boolean().optional(),
+    recurrenceIntervalDays: z.number().int().min(1).max(3650).optional(),
+    recurrencePeriod: z.enum(["AM", "PM", "AM_PM", "NOCHE"]).optional(),
+    skipHolidays: z.boolean().optional(),
     kind: z.enum(["SOMA", "SEDARTE", "PERSONAL", "VACACIONES"]),
     status: z
       .enum([
@@ -38,6 +50,66 @@ export const createCalendarEntrySchema = z
     notes: z.string().trim().max(500).optional(),
   })
   .superRefine((entry, context) => {
+    const recurrenceStartDate = entry.recurrenceStartDate ?? entry.date
+    if (entry.recurrenceId && !entry.repeatWeekly) {
+      context.addIssue({
+        code: "custom",
+        message: "Una ocurrencia recurrente debe conservar su serie",
+        path: ["repeatWeekly"],
+      })
+    }
+    if (entry.repeatWeekly) {
+      if (entry.kind !== "SOMA" && entry.kind !== "PERSONAL") {
+        context.addIssue({
+          code: "custom",
+          message: "Sólo los turnos Soma y eventos personales se pueden repetir",
+          path: ["repeatWeekly"],
+        })
+      }
+      const recurrenceFrequency = entry.recurrenceFrequency ?? "WEEKLY"
+      const recurrenceWeekdays = entry.recurrenceWeekdays?.length
+        ? entry.recurrenceWeekdays
+        : entry.recurrenceWeekday === undefined
+          ? []
+          : [entry.recurrenceWeekday]
+      if (recurrenceFrequency === "WEEKLY" && recurrenceWeekdays.length === 0) {
+        context.addIssue({
+          code: "custom",
+          message: "Selecciona al menos un día semanal",
+          path: ["recurrenceWeekdays"],
+        })
+      }
+      if (recurrenceFrequency === "MONTHLY" && !entry.recurrenceLastDayOfMonth && !entry.recurrenceDayOfMonth) {
+        context.addIssue({ code: "custom", message: "Selecciona el día del mes", path: ["recurrenceDayOfMonth"] })
+      }
+      if (recurrenceFrequency === "INTERVAL" && !entry.recurrenceIntervalDays) {
+        context.addIssue({
+          code: "custom",
+          message: "Indica cada cuántos días repetir",
+          path: ["recurrenceIntervalDays"],
+        })
+      }
+      if (entry.recurrenceEndDate && entry.recurrenceEndDate < recurrenceStartDate) {
+        context.addIssue({
+          code: "custom",
+          message: "La fecha final debe ser igual o posterior al inicio",
+          path: ["recurrenceEndDate"],
+        })
+      }
+      if (entry.kind === "SOMA" && !entry.recurrencePeriod) {
+        context.addIssue({
+          code: "custom",
+          message: "Selecciona la jornada que se repetirá",
+          path: ["recurrencePeriod"],
+        })
+      }
+      if (
+        entry.kind === "SOMA" &&
+        (entry.status === "TURNO_OTRA_PERSONA" || entry.status === "TURNO_DE_OTRA_PERSONA")
+      ) {
+        context.addIssue({ code: "custom", message: "Los turnos cubiertos no se pueden repetir", path: ["status"] })
+      }
+    }
     if (entry.restoreAutomatic && entry.kind !== "SOMA") {
       context.addIssue({
         code: "custom",

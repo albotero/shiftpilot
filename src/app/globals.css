@@ -2399,9 +2399,11 @@ a {
 }
 
 .quick-add-dialog {
+  display: flex;
+  flex-direction: column;
   width: min(470px, 100%);
   max-height: min(88vh, 740px);
-  overflow-y: auto;
+  overflow: hidden;
   padding: 21px;
   border: 1px solid #e5e9e3;
   border-radius: 8px;
@@ -2411,6 +2413,7 @@ a {
 }
 
 .dialog-header {
+  flex: 0 0 auto;
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
@@ -2432,8 +2435,14 @@ a {
 }
 
 .quick-add-form {
+  flex: 1 1 auto;
   display: grid;
+  min-height: 0;
   gap: 13px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-right: 6px;
+  margin-right: -6px;
 }
 
 .form-row {
@@ -2528,10 +2537,35 @@ a {
   font-size: 10px;
 }
 
+.recurrence-option-toggle {
+  font-size: 11px;
+  font-weight: 620;
+}
+
 .time-toggle input {
   width: 14px;
   height: 14px;
   accent-color: #477449;
+}
+
+.recurrence-weekdays {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+}
+
+.recurrence-weekday {
+  flex: 1 1 0;
+  justify-content: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.recurrence-weekday span {
+  min-width: 1em;
+  text-align: center;
 }
 
 .form-field input:focus,

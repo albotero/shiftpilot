@@ -19,6 +19,8 @@ type QuickAddDialogProps = {
 
 type ReplacementPerson = { id: string; name: string; active: boolean }
 type SomaFormStatus = SomaStatus | "AUTOMATICO"
+const weekdays = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"]
+const weekdayInitials = ["D", "L", "M", "X", "J", "V", "S"]
 
 const shiftStatuses: SomaStatus[] = [
   "R5",
@@ -54,9 +56,28 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
       : "AUTOMATICO",
   )
   const [period, setPeriod] = useState<ShiftPeriod>(
-    initialEntry?.period === "AM + PM" ? "AM" : (initialEntry?.period ?? "AM"),
+    initialEntry?.recurrencePeriod === "AM_PM"
+      ? "AM + PM"
+      : initialEntry?.period === "AM + PM"
+        ? "AM"
+        : (initialEntry?.period ?? "AM"),
   )
   const [date, setDate] = useState(initialEntry?.date ?? toDateKey(initialDate))
+  const [repeatWeekly, setRepeatWeekly] = useState(Boolean(initialEntry?.recurrenceId))
+  const [recurrenceFrequency, setRecurrenceFrequency] = useState(initialEntry?.recurrenceFrequency ?? "WEEKLY")
+  const [recurrenceWeekdays, setRecurrenceWeekdays] = useState<number[]>(
+    initialEntry?.recurrenceWeekdays ??
+      (initialEntry?.recurrenceWeekday === undefined ? [] : [initialEntry.recurrenceWeekday]),
+  )
+  const [recurrenceDayOfMonth, setRecurrenceDayOfMonth] = useState(
+    initialEntry?.recurrenceDayOfMonth ?? Number((initialEntry?.date ?? toDateKey(initialDate)).slice(-2)),
+  )
+  const [recurrenceLastDayOfMonth, setRecurrenceLastDayOfMonth] = useState(
+    Boolean(initialEntry?.recurrenceLastDayOfMonth),
+  )
+  const [recurrenceIntervalDays, setRecurrenceIntervalDays] = useState(initialEntry?.recurrenceIntervalDays ?? 1)
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState(initialEntry?.recurrenceEndDate ?? "")
+  const [skipHolidays, setSkipHolidays] = useState(Boolean(initialEntry?.skipHolidays))
   const [vacationWeeks, setVacationWeeks] = useState(() => {
     if (!initialEntry?.endDate) return 1
     try {
@@ -79,12 +100,16 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
   const [error, setError] = useState("")
   const [saving, setSaving] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+  const [pendingEdit, setPendingEdit] = useState<CalendarEntry | null>(null)
   const canDelete = Boolean(
-    initialEntry &&
-    initialEntry.kind !== "SOMA" &&
-    !(initialEntry.kind === "VACACIONES" && initialEntry.annualPlanYear),
+    initialEntry?.recurrenceId ||
+    (initialEntry &&
+      initialEntry.kind !== "SOMA" &&
+      !(initialEntry.kind === "VACACIONES" && initialEntry.annualPlanYear)),
   )
-  const canRestoreRotation = Boolean(initialEntry?.kind === "SOMA" && initialEntry.manualOverride)
+  const canRestoreRotation = Boolean(
+    initialEntry?.kind === "SOMA" && initialEntry.manualOverride && !initialEntry.recurrenceId,
+  )
   const isCoverageStatus = status === "TURNO_OTRA_PERSONA" || status === "TURNO_DE_OTRA_PERSONA"
   const showCurrentStatus = Boolean(
     initialEntry?.kind === "SOMA" &&
@@ -136,6 +161,26 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
         return
       }
     }
+    if (repeatWeekly && kind === "SOMA" && (status === "AUTOMATICO" || isCoverageStatus)) {
+      setError("Selecciona un turno Soma propio para repetir.")
+      return
+    }
+    if (repeatWeekly && recurrenceEndDate && recurrenceEndDate < date) {
+      setError("La fecha final debe ser igual o posterior al inicio.")
+      return
+    }
+    if (repeatWeekly && recurrenceFrequency === "WEEKLY" && recurrenceWeekdays.length === 0) {
+      setError("Selecciona al menos un día de la semana.")
+      return
+    }
+    if (
+      repeatWeekly &&
+      recurrenceFrequency === "INTERVAL" &&
+      (!Number.isInteger(recurrenceIntervalDays) || recurrenceIntervalDays < 1)
+    ) {
+      setError("Indica cada cuántos días debe repetirse.")
+      return
+    }
 
     let vacationEndDate: string | undefined
     if (kind === "VACACIONES") {
@@ -147,9 +192,26 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
       }
     }
 
+    const shouldRepeatWeekly = repeatWeekly && (kind === "SOMA" || kind === "PERSONAL")
     const entry = {
       id: initialEntry?.id ?? createEntryId(),
       date,
+      ...(shouldRepeatWeekly
+        ? {
+            repeatWeekly: true,
+            ...(initialEntry?.recurrenceId ? { recurrenceId: initialEntry.recurrenceId } : {}),
+            recurrenceStartDate: initialEntry?.recurrenceStartDate ?? date,
+            recurrenceEndDate: recurrenceEndDate || null,
+            recurrenceFrequency,
+            recurrenceWeekday: recurrenceFrequency === "WEEKLY" ? recurrenceWeekdays[0] : undefined,
+            recurrenceWeekdays: recurrenceFrequency === "WEEKLY" ? recurrenceWeekdays : [],
+            recurrenceDayOfMonth: recurrenceFrequency === "MONTHLY" ? recurrenceDayOfMonth : undefined,
+            recurrenceLastDayOfMonth: recurrenceFrequency === "MONTHLY" && recurrenceLastDayOfMonth,
+            recurrenceIntervalDays: recurrenceFrequency === "INTERVAL" ? recurrenceIntervalDays : undefined,
+            skipHolidays,
+            ...(kind === "SOMA" ? { recurrencePeriod: period === "AM + PM" ? "AM_PM" : period } : {}),
+          }
+        : {}),
       ...(vacationEndDate ? { endDate: vacationEndDate } : {}),
       kind,
       ...(kind === "SOMA"
@@ -185,6 +247,12 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
       return
     }
 
+    if (initialEntry?.recurrenceId) {
+      setPendingEdit(parsed.data)
+      setError("")
+      return
+    }
+
     setSaving(true)
     setError("")
     try {
@@ -196,16 +264,34 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
     }
   }
 
-  async function deleteEntry() {
+  async function saveRecurringEdit(scope: "OCCURRENCE" | "THIS_AND_FUTURE") {
+    if (!pendingEdit) return
+    setSaving(true)
+    setError("")
+    try {
+      await onSave({ ...pendingEdit, recurrenceEditScope: scope })
+      setPendingEdit(null)
+    } catch (saveError) {
+      setError(saveError instanceof Error ? saveError.message : "No se pudo modificar la serie.")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function deleteEntry(scope?: "ALL" | "FUTURE") {
     if (!initialEntry || !onDelete) return
-    if (!confirmDelete) {
+    if (initialEntry.recurrenceId && !scope) {
+      setConfirmDelete(true)
+      return
+    }
+    if (!initialEntry.recurrenceId && !confirmDelete) {
       setConfirmDelete(true)
       return
     }
     setSaving(true)
     setError("")
     try {
-      await onDelete(initialEntry)
+      await onDelete(scope ? { ...initialEntry, recurrenceDeleteScope: scope } : initialEntry)
     } catch (deleteError) {
       setError(
         deleteError instanceof Error
@@ -229,7 +315,13 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
         <div className="dialog-header">
           <div>
             <p className="eyebrow">Registro nuevo</p>
-            <h2 id="quick-add-title">{isEditing ? "Editar registro" : "Agregar al calendario"}</h2>
+            <h2 id="quick-add-title">
+              {initialEntry?.recurrenceId
+                ? "Editar serie semanal"
+                : isEditing
+                  ? "Editar registro"
+                  : "Agregar al calendario"}
+            </h2>
           </div>
           <button className="icon-button" aria-label="Cerrar" onClick={onClose}>
             <X size={18} />
@@ -241,7 +333,11 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
             <select
               value={kind}
               disabled={isEditing}
-              onChange={(event) => setKind(event.target.value as CalendarEntryKind)}
+              onChange={(event) => {
+                const nextKind = event.target.value as CalendarEntryKind
+                setKind(nextKind)
+                if (nextKind !== "SOMA" && nextKind !== "PERSONAL") setRepeatWeekly(false)
+              }}
             >
               <option value="SOMA">Soma</option>
               <option value="SEDARTE">Evento Sedarte</option>
@@ -273,7 +369,7 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
                       setError("")
                     }}
                   >
-                    <option value="AUTOMATICO">Automático</option>
+                    {!repeatWeekly && <option value="AUTOMATICO">Automático</option>}
                     {showCurrentStatus && initialEntry?.status && (
                       <option value={initialEntry.status}>
                         {statusLabels[initialEntry.status] ?? initialEntry.status}
@@ -368,6 +464,125 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
             </>
           )}
 
+          {(kind === "SOMA" || kind === "PERSONAL") && (
+            <>
+              <label className="time-toggle recurrence-option-toggle">
+                <input
+                  type="checkbox"
+                  checked={repeatWeekly}
+                  disabled={Boolean(initialEntry?.recurrenceId)}
+                  onChange={(event) => {
+                    setRepeatWeekly(event.target.checked)
+                    if (event.target.checked && status === "AUTOMATICO") setStatus("R5")
+                    setError("")
+                  }}
+                />
+                <span>{initialEntry?.recurrenceId ? "Serie recurrente" : "Repetir"}</span>
+              </label>
+              {repeatWeekly && (
+                <>
+                  <div className="form-row">
+                    <label className="form-field">
+                      <span>Frecuencia</span>
+                      <select
+                        value={recurrenceFrequency}
+                        onChange={(event) => setRecurrenceFrequency(event.target.value as typeof recurrenceFrequency)}
+                      >
+                        <option value="WEEKLY">Cada semana</option>
+                        <option value="MONTHLY">Cada mes</option>
+                        <option value="INTERVAL">Cada N días</option>
+                      </select>
+                    </label>
+                    <div className="form-field">
+                      <label htmlFor="recurrence-end-date">Repetir hasta · opcional</label>
+                      <DateInput
+                        id="recurrence-end-date"
+                        ariaLabel="Fecha final de repetición"
+                        value={recurrenceEndDate}
+                        onChange={setRecurrenceEndDate}
+                      />
+                    </div>
+                  </div>
+                  {recurrenceFrequency === "WEEKLY" && (
+                    <fieldset className="form-field">
+                      <legend>Días de la semana</legend>
+                      <div className="recurrence-weekdays">
+                        {weekdays.map((weekday, index) => (
+                          <label className="time-toggle recurrence-weekday" key={weekday} title={weekday}>
+                            <input
+                              type="checkbox"
+                              aria-label={weekday}
+                              checked={recurrenceWeekdays.includes(index)}
+                              onChange={(event) => {
+                                setRecurrenceWeekdays((selected) =>
+                                  event.target.checked
+                                    ? [...selected, index].sort((left, right) => left - right)
+                                    : selected.filter((day) => day !== index),
+                                )
+                                setError("")
+                              }}
+                            />
+                            <span aria-hidden="true">{weekdayInitials[index]}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </fieldset>
+                  )}
+                  {recurrenceFrequency === "MONTHLY" && (
+                    <div className="form-row">
+                      <label className="form-field">
+                        <span>Repetir el</span>
+                        <select
+                          value={recurrenceLastDayOfMonth ? "LAST" : "DAY"}
+                          onChange={(event) => setRecurrenceLastDayOfMonth(event.target.value === "LAST")}
+                        >
+                          <option value="DAY">Día específico</option>
+                          <option value="LAST">Último día del mes</option>
+                        </select>
+                      </label>
+                      {!recurrenceLastDayOfMonth && (
+                        <label className="form-field">
+                          <span>Día del mes</span>
+                          <select
+                            value={recurrenceDayOfMonth}
+                            onChange={(event) => setRecurrenceDayOfMonth(Number(event.target.value))}
+                          >
+                            {Array.from({ length: 31 }, (_, index) => index + 1).map((day) => (
+                              <option key={day} value={day}>
+                                {day}
+                              </option>
+                            ))}
+                          </select>
+                        </label>
+                      )}
+                    </div>
+                  )}
+                  {recurrenceFrequency === "INTERVAL" && (
+                    <label className="form-field">
+                      <span>Repetir cada · días</span>
+                      <input
+                        type="number"
+                        min="1"
+                        max="3650"
+                        step="1"
+                        value={recurrenceIntervalDays}
+                        onChange={(event) => setRecurrenceIntervalDays(Number(event.target.value))}
+                      />
+                    </label>
+                  )}
+                  <label className="time-toggle recurrence-option-toggle">
+                    <input
+                      type="checkbox"
+                      checked={skipHolidays}
+                      onChange={(event) => setSkipHolidays(event.target.checked)}
+                    />
+                    <span>Omitir festivos nacionales de Colombia</span>
+                  </label>
+                </>
+              )}
+            </>
+          )}
+
           {kind !== "SOMA" && kind !== "VACACIONES" && (
             <>
               <label className="form-field">
@@ -451,7 +666,14 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
             <div className="form-row">
               <div className="form-field">
                 <label htmlFor="calendar-entry-date">Fecha</label>
-                <DateInput id="calendar-entry-date" ariaLabel="Fecha" value={date} onChange={setDate} required />
+                <DateInput
+                  id="calendar-entry-date"
+                  ariaLabel="Fecha"
+                  value={date}
+                  onChange={setDate}
+                  readOnly={Boolean(initialEntry?.recurrenceId)}
+                  required
+                />
               </div>
               {kind !== "SOMA" && (
                 <label className="form-field">
@@ -471,6 +693,35 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
             <span>Notas · opcional</span>
             <textarea value={notes} onChange={(event) => setNotes(event.target.value)} maxLength={500} rows={2} />
           </label>
+          {pendingEdit && (
+            <div className="delete-confirmation" role="alert">
+              <span>¿Qué quieres modificar? Las ocurrencias pasadas se conservarán.</span>
+              <button
+                type="button"
+                className="confirm-delete-button"
+                onClick={() => void saveRecurringEdit("OCCURRENCE")}
+                disabled={saving}
+              >
+                Solo este evento
+              </button>
+              <button
+                type="button"
+                className="confirm-delete-button"
+                onClick={() => void saveRecurringEdit("THIS_AND_FUTURE")}
+                disabled={saving}
+              >
+                Este y los futuros
+              </button>
+              <button
+                type="button"
+                className="cancel-delete-button"
+                onClick={() => setPendingEdit(null)}
+                disabled={saving}
+              >
+                Cancelar
+              </button>
+            </div>
+          )}
           {error && (
             <p className="form-error" role="alert">
               {error}
@@ -481,16 +732,39 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
               <span>
                 {canRestoreRotation
                   ? "¿Restaurar la rotación automática? Si no hay turno programado, se quitará el ajuste manual."
-                  : "¿Eliminar este registro? Esta acción no se puede deshacer."}
+                  : initialEntry?.recurrenceId
+                    ? "¿Qué quieres eliminar? Puedes conservar los eventos pasados."
+                    : "¿Eliminar este registro? Esta acción no se puede deshacer."}
               </span>
-              <button
-                type="button"
-                className="confirm-delete-button"
-                onClick={() => void deleteEntry()}
-                disabled={saving}
-              >
-                {canRestoreRotation ? "Sí, restaurar" : "Sí, eliminar"}
-              </button>
+              {initialEntry?.recurrenceId ? (
+                <>
+                  <button
+                    type="button"
+                    className="confirm-delete-button"
+                    onClick={() => void deleteEntry("ALL")}
+                    disabled={saving}
+                  >
+                    Toda la serie, incluidos pasados
+                  </button>
+                  <button
+                    type="button"
+                    className="confirm-delete-button"
+                    onClick={() => void deleteEntry("FUTURE")}
+                    disabled={saving}
+                  >
+                    Solo este evento y los futuros
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  className="confirm-delete-button"
+                  onClick={() => void deleteEntry()}
+                  disabled={saving}
+                >
+                  {canRestoreRotation ? "Sí, restaurar" : "Sí, eliminar"}
+                </button>
+              )}
               <button
                 type="button"
                 className="cancel-delete-button"
@@ -510,7 +784,7 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
                 disabled={saving}
               >
                 {canRestoreRotation ? <RotateCcw size={15} /> : <Trash2 size={15} />}
-                {canRestoreRotation ? "Restaurar rotación" : "Eliminar"}
+                {canRestoreRotation ? "Restaurar rotación" : initialEntry?.recurrenceId ? "Eliminar serie" : "Eliminar"}
               </button>
             )}
             <button type="button" className="cancel-button" onClick={onClose} disabled={saving}>
