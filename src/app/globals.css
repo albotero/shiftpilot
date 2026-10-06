@@ -2660,6 +2660,24 @@ a {
   font-size: 10px;
 }
 
+.telegram-pairing-button {
+  justify-self: center;
+  width: max-content;
+}
+
+.telegram-pairing-link {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.telegram-open-link {
+  width: max-content;
+  max-width: 100%;
+  text-decoration: none;
+}
+
 .mobile-menu-button,
 .mobile-bottom-nav {
   display: none;
