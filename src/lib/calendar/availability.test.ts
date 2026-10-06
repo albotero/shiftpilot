@@ -173,6 +173,27 @@ describe("calendar availability", () => {
     expect(conflicts).toMatchObject([{ date: "2026-10-05", type: "HORARIO" }])
   })
 
+  it("detects an Adicional AM reservation overlapping a timed personal event", () => {
+    const additionalAm: CalendarEntry = { ...reservedShift, date: "2026-10-17", status: "R5", period: "AM" }
+    const personal: CalendarEntry = {
+      id: "personal-recurring",
+      date: "2026-10-17",
+      kind: "PERSONAL",
+      title: "Evento personal",
+      startTime: "09:00",
+      durationHours: 2,
+    }
+
+    expect(findScheduleConflicts([additionalAm, personal], somaShiftWindows)).toMatchObject([
+      {
+        date: "2026-10-17",
+        firstEntryId: additionalAm.id,
+        secondEntryId: personal.id,
+        type: "HORARIO",
+      },
+    ])
+  })
+
   it("detects overlapping timed Sedarte and personal events", () => {
     const sedarte: CalendarEntry = {
       id: "sedarte-event",

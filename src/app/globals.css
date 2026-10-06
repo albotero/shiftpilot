@@ -1645,6 +1645,65 @@ a {
   font-size: 8px;
 }
 
+.calendar-conflict-notice {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 12px 14px;
+  border: 1px solid #e8b9a9;
+  border-radius: 6px;
+  background: #fff5f1;
+  color: #843d30;
+}
+
+.calendar-conflict-summary {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+}
+
+.calendar-conflict-summary > svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.calendar-conflict-summary > div {
+  display: grid;
+  gap: 3px;
+}
+
+.calendar-conflict-summary strong {
+  font-size: 13px;
+}
+
+.calendar-conflict-summary span {
+  color: #986456;
+  font-size: 11px;
+}
+
+.calendar-conflict-list {
+  display: grid;
+  gap: 3px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.calendar-conflict-list a {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  padding: 5px 0;
+  color: #773f34;
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.calendar-conflict-list a:hover {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
 .conflict-list a:hover span {
   text-decoration: underline;
 }

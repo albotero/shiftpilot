@@ -2,6 +2,8 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react"
 import { addDays } from "date-fns"
+import Link from "next/link"
+import { TriangleAlert } from "lucide-react"
 import { CalendarPanel } from "@/components/calendar/CalendarPanel"
 import { QuickAddDialog } from "@/components/calendar/QuickAddDialog"
 import {
@@ -14,7 +16,8 @@ import {
   updateCalendarEntry,
 } from "@/lib/calendar/storage"
 import { calendarEntriesSchema } from "@/lib/calendar/schema"
-import { getVisibleDays, toDateKey } from "@/lib/calendar/utils"
+import { findScheduleConflicts, somaShiftWindows } from "@/lib/calendar/availability"
+import { formatLongDate, getEntryLabel, getVisibleDays, toDateKey } from "@/lib/calendar/utils"
 import type { CalendarEntry, CalendarView, EntryFilters } from "@/lib/calendar/types"
 
 const initialFilters: EntryFilters = { SOMA: true, SEDARTE: true, PERSONAL: true, VACACIONES: true }
@@ -41,6 +44,11 @@ export function CalendarWorkspace({
     from: toDateKey(visibleDays[0]),
     to: toDateKey(visibleDays[visibleDays.length - 1]),
   }
+  const allEntries = [...entries, ...recurringEntries]
+  const entriesById = new Map(allEntries.map((entry) => [entry.id, entry]))
+  const visibleConflicts = findScheduleConflicts(allEntries, somaShiftWindows).filter(
+    (conflict) => conflict.date >= recurrenceRange.from && conflict.date <= recurrenceRange.to,
+  )
 
   useEffect(() => {
     let active = true
@@ -88,8 +96,38 @@ export function CalendarWorkspace({
 
   return (
     <>
+      {visibleConflicts.length > 0 && (
+        <aside className="calendar-conflict-notice" role="status" aria-live="polite">
+          <div className="calendar-conflict-summary">
+            <TriangleAlert size={18} aria-hidden="true" />
+            <div>
+              <strong>
+                {visibleConflicts.length} solapamiento{visibleConflicts.length === 1 ? "" : "s"} de horario
+              </strong>
+              <span>Un turno coincide con otra actividad en este período.</span>
+            </div>
+          </div>
+          <ul className="calendar-conflict-list">
+            {visibleConflicts.map((conflict) => {
+              const firstEntry = entriesById.get(conflict.firstEntryId)
+              const secondEntry = entriesById.get(conflict.secondEntryId)
+              return (
+                <li key={`${conflict.date}:${conflict.firstEntryId}:${conflict.secondEntryId}`}>
+                  <Link href={`/calendar?date=${conflict.date}&view=week`}>
+                    <time dateTime={conflict.date}>{formatLongDate(new Date(`${conflict.date}T12:00:00`))}</time>
+                    <span>
+                      {firstEntry ? getEntryLabel(firstEntry) : "Actividad"} ·{" "}
+                      {secondEntry ? getEntryLabel(secondEntry) : "Actividad"}
+                    </span>
+                  </Link>
+                </li>
+              )
+            })}
+          </ul>
+        </aside>
+      )}
       <CalendarPanel
-        entries={[...entries, ...recurringEntries]}
+        entries={allEntries}
         activeDate={activeDate}
         view={view}
         filters={filters}
