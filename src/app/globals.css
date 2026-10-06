@@ -611,6 +611,10 @@ a {
   animation: rise-in 560ms 110ms ease both;
 }
 
+.overview-columns {
+  grid-template-columns: minmax(280px, 0.72fr) minmax(0, 1fr);
+}
+
 .calendar-panel,
 .rail-section {
   border: 1px solid #e3e8e1;
@@ -2930,6 +2934,10 @@ a {
   .dashboard-columns {
     grid-template-columns: minmax(0, 1fr) 255px;
     gap: 11px;
+  }
+
+  .overview-columns {
+    grid-template-columns: minmax(250px, 0.8fr) minmax(0, 1fr);
   }
 
   .calendar-day {
