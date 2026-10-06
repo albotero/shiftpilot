@@ -1,6 +1,8 @@
 "use client"
 
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react"
+import { format } from "date-fns"
+import { es } from "date-fns/locale"
 import { FilePlus2, FileUp, Pencil, Plus, Trash2, X } from "lucide-react"
 import { DateInput } from "@/components/forms/DateInput"
 import { DEFAULT_BILLING_SETTINGS, type BillingSettings } from "@/lib/billing/calculations"
@@ -13,7 +15,6 @@ import {
   type InvoiceMutation,
 } from "@/lib/billing/invoice-service"
 import { parseInvoicePdfText } from "@/lib/billing/pdf-import"
-import { formatDateDmy } from "@/lib/date-format"
 
 type InvoiceType = InvoiceMutation["type"]
 type InvoiceStatus = InvoiceMutation["status"]
@@ -70,7 +71,7 @@ function formatAmount(amount: number) {
 }
 
 function formatDate(date: string | null) {
-  return date ? formatDateDmy(date) : "—"
+  return date ? format(new Date(`${date}T12:00:00`), "dd MMM. yyyy", { locale: es }) : "—"
 }
 
 function errorMessage(value: unknown, fallback: string) {
@@ -324,10 +325,6 @@ export function InvoiceManager({
   return (
     <section className="invoice-manager" id="invoices" aria-labelledby="invoice-manager-title">
       <div className="invoice-manager-heading">
-        <div>
-          <p className="eyebrow">Finanzas</p>
-          {formatAmount(addMoney(...invoices.map((invoice) => invoice.netAmount)))} miles COP
-        </div>
         <div className="invoice-manager-actions">
           <input
             ref={pdfInputRef}
@@ -347,9 +344,6 @@ export function InvoiceManager({
           >
             <FileUp size={15} /> {pdfImporting ? "Leyendo PDF…" : "Importar PDF"}
           </button>
-          <span className="invoice-month-total">
-            {formatAmount(invoices.reduce((total, invoice) => total + invoice.netAmount, 0))} miles COP
-          </span>
         </div>
       </div>
 

@@ -1,10 +1,11 @@
 import { addMoney, maxMoney, roundMoneyAmount } from "@/lib/money/integer"
 import type { Prisma } from "@prisma/client"
 import {
-  calculateIbc,
   calculateSocialSecurity,
-  DEFAULT_SOCIAL_SECURITY_RATES,
-  type SocialSecurityRates,
+  DEFAULT_SOCIAL_SECURITY_CONFIGURATION,
+  getCalculatedSocialSecurityRates,
+  getSocialSecurityConfiguration,
+  type SocialSecurityConfiguration,
 } from "./calculations"
 import type { MinimumWageSnapshot } from "./minimum-wage"
 
@@ -14,14 +15,6 @@ export type InvoiceMonthlyAmounts = {
   shiftDiscountAmount: number
   netAmount: number
 }
-
-const rateSettingKeys = {
-  ibcRatePpm: "socialSecurity.ibcRatePpm",
-  healthRatePpm: "socialSecurity.healthRatePpm",
-  pensionRatePpm: "socialSecurity.pensionRatePpm",
-  arlRatePpm: "socialSecurity.arlRatePpm",
-  fundRatePpm: "socialSecurity.fundRatePpm",
-} as const
 
 export type SocialSecurityPeriodDatabase = Pick<
   Prisma.TransactionClient,
@@ -35,30 +28,18 @@ function getMonthStart(month: string) {
   return new Date(Date.UTC(year, monthNumber - 1, 1))
 }
 
-export function getSocialSecurityRates(settings: { key: string; value: unknown }[]): SocialSecurityRates {
-  const values = new Map(settings.map((setting) => [setting.key, setting.value]))
-  return Object.fromEntries(
-    Object.entries(rateSettingKeys).map(([field, key]) => {
-      const value = values.get(key)
-      const fallback = DEFAULT_SOCIAL_SECURITY_RATES[field as keyof SocialSecurityRates]
-      return [
-        field,
-        typeof value === "number" && Number.isSafeInteger(value) && value >= 0 && value <= 1_000_000 ? value : fallback,
-      ]
-    }),
-  ) as SocialSecurityRates
-}
-
 export function calculateSocialSecurityPeriod(
   invoices: InvoiceMonthlyAmounts[],
-  rates: SocialSecurityRates,
+  configuration: SocialSecurityConfiguration = DEFAULT_SOCIAL_SECURITY_CONFIGURATION,
   minimumIbcAmount = 0,
+  minimumWageCop = 0,
 ) {
   const grossAmount = addMoney(...invoices.map((invoice) => invoice.grossAmount))
   const discounts = addMoney(...invoices.flatMap((invoice) => [invoice.discountAmount, invoice.shiftDiscountAmount]))
   const netAmount = addMoney(...invoices.map((invoice) => invoice.netAmount))
-  const ibcPercentage = calculateIbc(netAmount, rates.ibcRatePpm)
+  const ibcPercentage = roundMoneyAmount(netAmount * 0.4)
   const ibcAmount = maxMoney(ibcPercentage, minimumIbcAmount)
+  const rates = getCalculatedSocialSecurityRates(configuration, ibcAmount, minimumWageCop)
   const contributions = calculateSocialSecurity(ibcAmount, rates)
 
   return {
@@ -66,10 +47,13 @@ export function calculateSocialSecurityPeriod(
     discounts,
     netAmount,
     ibcAmount,
+    configuration,
+    rates,
     healthAmountTenths: contributions.healthAmountTenths,
     pensionAmountTenths: contributions.pensionAmountTenths,
     arlAmountTenths: contributions.arlAmountTenths,
     fundAmountTenths: contributions.fundAmountTenths,
+    solidarityAmountTenths: contributions.solidarityAmountTenths,
     totalAmountTenths: contributions.totalAmountTenths,
   }
 }
@@ -88,17 +72,19 @@ export async function recalculateSocialSecurityPeriod(
     }),
     database.appSetting.findMany({ where: { key: { startsWith: "socialSecurity." } } }),
   ])
-  const rates = getSocialSecurityRates(settingRecords)
-  const amounts = calculateSocialSecurityPeriod(
+  const configuration = getSocialSecurityConfiguration(settingRecords)
+  const calculated = calculateSocialSecurityPeriod(
     invoices.map((invoice) => ({
       grossAmount: Number(invoice.grossAmount),
       discountAmount: Number(invoice.discountAmount),
       shiftDiscountAmount: Number(invoice.shiftDiscountAmount),
       netAmount: Number(invoice.netAmount),
     })),
-    rates,
+    configuration,
     roundMoneyAmount(minimumWage.amountCop / 1000),
+    minimumWage.amountCop,
   )
+  const { rates, configuration: savedConfiguration, ...amounts } = calculated
   const record = await database.socialSecurityPeriod.upsert({
     where: { month: monthStart },
     create: { month: monthStart, ...amounts },
@@ -108,6 +94,7 @@ export async function recalculateSocialSecurityPeriod(
   return {
     month,
     rates,
+    configuration: savedConfiguration,
     minimumWage,
     period: {
       grossAmount: Number(record.grossAmount),
@@ -118,6 +105,7 @@ export async function recalculateSocialSecurityPeriod(
       pensionAmountTenths: record.pensionAmountTenths,
       arlAmountTenths: record.arlAmountTenths,
       fundAmountTenths: record.fundAmountTenths,
+      solidarityAmountTenths: record.solidarityAmountTenths,
       totalAmountTenths: record.totalAmountTenths,
     },
   }

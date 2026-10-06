@@ -2068,7 +2068,19 @@ a {
 }
 
 .social-security-rate-grid {
-  grid-template-columns: repeat(5, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.social-security-option {
+  align-self: center;
+  min-height: 38px;
+}
+
+.social-security-config-note {
+  margin: 0;
+  color: #78837c;
+  font-size: 9px;
+  line-height: 1.5;
 }
 
 .finance-page-actions {
@@ -2111,21 +2123,11 @@ a {
   font-weight: 650;
 }
 
-.invoice-manager-heading .eyebrow {
-  margin-bottom: 3px;
-}
-
-.invoice-month-total {
-  color: #3e6745;
-  font-size: 13px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-
 .invoice-manager-actions {
   display: flex;
   align-items: center;
   gap: 10px;
+  margin-left: auto;
 }
 
 .invoice-import-button {

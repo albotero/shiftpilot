@@ -10,6 +10,10 @@ import { getDebtPlanSnapshot } from "@/lib/debt/plan-snapshot"
 import {
   calculateIbc,
   calculateSocialSecurity,
+  getCalculatedSocialSecurityRates,
+  getSocialSecurityConfiguration,
+  getSolidarityRatePpm,
+  DEFAULT_SOCIAL_SECURITY_CONFIGURATION,
   DEFAULT_SOCIAL_SECURITY_RATES,
 } from "@/lib/social-security/calculations"
 import { assertMoneyAmount, percentageOf, roundUpPercentageToScale } from "@/lib/money/integer"
@@ -61,8 +65,9 @@ describe("social security calculations", () => {
       healthAmountTenths: 1250,
       pensionAmountTenths: 1600,
       arlAmountTenths: 244,
-      fundAmountTenths: 100,
-      totalAmountTenths: 3194,
+      fundAmountTenths: 0,
+      solidarityAmountTenths: 0,
+      totalAmountTenths: 3094,
     })
   })
 
@@ -86,6 +91,7 @@ describe("social security calculations", () => {
       pensionRatePpm: 125_000,
       arlRatePpm: 125_000,
       fundRatePpm: 125_000,
+      solidarityRatePpm: 125_000,
     }
 
     for (const [ibc, expectedTenths] of [
@@ -98,8 +104,52 @@ describe("social security calculations", () => {
       expect(result.pensionAmountTenths).toBe(expectedTenths)
       expect(result.arlAmountTenths).toBe(expectedTenths)
       expect(result.fundAmountTenths).toBe(expectedTenths)
-      expect(result.totalAmountTenths).toBe(expectedTenths * 4)
+      expect(result.solidarityAmountTenths).toBe(expectedTenths)
+      expect(result.totalAmountTenths).toBe(expectedTenths * 5)
     }
+  })
+
+  it("calculates solidarity progressively from four minimum wages only when pension is paid", () => {
+    const minimumWage = 1_750_905
+    const thresholds = [4, 16, 17, 18, 19, 20].map((multiple) =>
+      getSolidarityRatePpm((minimumWage * multiple) / 1000, minimumWage, true),
+    )
+
+    expect(thresholds).toEqual([10_000, 12_000, 14_000, 16_000, 18_000, 20_000])
+    expect(getSolidarityRatePpm((minimumWage * 4 - 1) / 1000, minimumWage, true)).toBe(0)
+    expect(getSolidarityRatePpm((minimumWage * 20) / 1000, minimumWage, false)).toBe(0)
+  })
+
+  it("derives pension, ARL class, and voluntary compensation fund rates from options", () => {
+    expect(
+      getCalculatedSocialSecurityRates(
+        { pensionEnabled: false, arlEnabled: true, arlRiskClass: "V", compensationFundEnabled: true },
+        100_000,
+        1_750_905,
+      ),
+    ).toEqual({
+      ...DEFAULT_SOCIAL_SECURITY_RATES,
+      pensionRatePpm: 0,
+      arlRatePpm: 69_600,
+      fundRatePpm: 20_000,
+      solidarityRatePpm: 0,
+    })
+    expect(DEFAULT_SOCIAL_SECURITY_CONFIGURATION.compensationFundEnabled).toBe(false)
+  })
+
+  it("does not reinterpret the legacy solidarity percentage as compensation fund enrollment", () => {
+    expect(
+      getSocialSecurityConfiguration([
+        { key: "socialSecurity.pensionRatePpm", value: 160_000 },
+        { key: "socialSecurity.arlRatePpm", value: 24_360 },
+        { key: "socialSecurity.fundRatePpm", value: 10_000 },
+      ]),
+    ).toEqual({
+      pensionEnabled: true,
+      arlEnabled: true,
+      arlRiskClass: "III",
+      compensationFundEnabled: false,
+    })
   })
 })
 

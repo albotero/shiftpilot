@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest"
-import { DEFAULT_SOCIAL_SECURITY_RATES } from "./calculations"
+import { DEFAULT_SOCIAL_SECURITY_CONFIGURATION } from "./calculations"
 import type { MinimumWageSnapshot } from "./minimum-wage"
 import { calculateSocialSecurityPeriod, recalculateSocialSecurityPeriod } from "./period"
 import type { SocialSecurityPeriodDatabase } from "./period"
@@ -23,7 +23,9 @@ describe("monthly social security period", () => {
           netAmount: 30_620.458,
         },
       ],
-      DEFAULT_SOCIAL_SECURITY_RATES,
+      DEFAULT_SOCIAL_SECURITY_CONFIGURATION,
+      0,
+      minimumWage.amountCop,
     )
 
     expect(period).toEqual({
@@ -31,37 +33,56 @@ describe("monthly social security period", () => {
       discounts: 16_824.665,
       netAmount: 30_620.458,
       ibcAmount: 12_248.183,
+      configuration: DEFAULT_SOCIAL_SECURITY_CONFIGURATION,
+      rates: {
+        ibcRatePpm: 400_000,
+        healthRatePpm: 125_000,
+        pensionRatePpm: 160_000,
+        arlRatePpm: 24_360,
+        fundRatePpm: 0,
+        solidarityRatePpm: 10_000,
+      },
       healthAmountTenths: 15_311,
       pensionAmountTenths: 19_598,
       arlAmountTenths: 2_984,
-      fundAmountTenths: 1_225,
+      fundAmountTenths: 0,
+      solidarityAmountTenths: 1_225,
       totalAmountTenths: 39_118,
     })
   })
 
   it("applies the SMMLV floor to a month without invoices", () => {
-    expect(calculateSocialSecurityPeriod([], DEFAULT_SOCIAL_SECURITY_RATES, 1_750.905)).toEqual({
+    expect(
+      calculateSocialSecurityPeriod([], DEFAULT_SOCIAL_SECURITY_CONFIGURATION, 1_750.905, minimumWage.amountCop),
+    ).toEqual({
       grossAmount: 0,
       discounts: 0,
       netAmount: 0,
       ibcAmount: 1_750.905,
+      configuration: DEFAULT_SOCIAL_SECURITY_CONFIGURATION,
+      rates: expect.objectContaining({ solidarityRatePpm: 0 }),
       healthAmountTenths: 2_189,
       pensionAmountTenths: 2_802,
       arlAmountTenths: 427,
-      fundAmountTenths: 176,
-      totalAmountTenths: 5_594,
+      fundAmountTenths: 0,
+      solidarityAmountTenths: 0,
+      totalAmountTenths: 5_418,
     })
   })
 
   it("uses one Colombian minimum wage as the IBC floor when 40% of net is lower", () => {
     const period = calculateSocialSecurityPeriod(
       [{ grossAmount: 800, discountAmount: 0, shiftDiscountAmount: 0, netAmount: 800 }],
-      DEFAULT_SOCIAL_SECURITY_RATES,
+      DEFAULT_SOCIAL_SECURITY_CONFIGURATION,
       1_750.905,
+      minimumWage.amountCop,
     )
 
     expect(period).toMatchObject({ netAmount: 800, ibcAmount: 1_750.905 })
-    expect(calculateSocialSecurityPeriod([], DEFAULT_SOCIAL_SECURITY_RATES, 1_750.905).ibcAmount).toBe(1_750.905)
+    expect(
+      calculateSocialSecurityPeriod([], DEFAULT_SOCIAL_SECURITY_CONFIGURATION, 1_750.905, minimumWage.amountCop)
+        .ibcAmount,
+    ).toBe(1_750.905)
   })
 
   it("persists exactly one configured period for the requested month on every recalculation", async () => {
@@ -72,7 +93,9 @@ describe("monthly social security period", () => {
           .mockResolvedValue([{ grossAmount: 1000, discountAmount: 100, shiftDiscountAmount: 0, netAmount: 900 }]),
       },
       appSetting: {
-        findMany: vi.fn().mockResolvedValue([{ key: "socialSecurity.ibcRatePpm", value: 500_000 }]),
+        findMany: vi
+          .fn()
+          .mockResolvedValue([{ key: "socialSecurity.configuration", value: DEFAULT_SOCIAL_SECURITY_CONFIGURATION }]),
       },
       socialSecurityPeriod: {
         upsert: vi.fn(async ({ where, create, update }) => ({
@@ -97,7 +120,7 @@ describe("monthly social security period", () => {
       select: { grossAmount: true, discountAmount: true, shiftDiscountAmount: true, netAmount: true },
     })
     expect(database.socialSecurityPeriod.upsert).toHaveBeenCalledTimes(2)
-    expect(first.rates.ibcRatePpm).toBe(500_000)
+    expect(first.rates.ibcRatePpm).toBe(400_000)
     expect(first.period).toEqual(second.period)
     expect(first.period).toMatchObject({
       grossAmount: 1000,

@@ -5,12 +5,11 @@ import { prisma } from "@/server/db"
 
 export const dynamic = "force-dynamic"
 
-const ratesSchema = z.object({
-  ibcRatePpm: z.number().int().min(0).max(1_000_000),
-  healthRatePpm: z.number().int().min(0).max(1_000_000),
-  pensionRatePpm: z.number().int().min(0).max(1_000_000),
-  arlRatePpm: z.number().int().min(0).max(1_000_000),
-  fundRatePpm: z.number().int().min(0).max(1_000_000),
+const configurationSchema = z.object({
+  pensionEnabled: z.boolean(),
+  arlEnabled: z.boolean(),
+  arlRiskClass: z.enum(["I", "II", "III", "IV", "V"]),
+  compensationFundEnabled: z.boolean(),
 })
 
 function validMonth(month: string | null): month is string {
@@ -42,22 +41,20 @@ export async function PATCH(request: Request) {
     return Response.json({ error: "El cuerpo debe ser JSON válido" }, { status: 400 })
   }
 
-  const parsed = z.object({ month: z.string(), rates: ratesSchema }).safeParse(body)
+  const parsed = z.object({ month: z.string(), configuration: configurationSchema }).safeParse(body)
   if (!parsed.success || !validMonth(parsed.data?.month ?? null)) {
-    return Response.json({ error: "Mes o tasas inválidas" }, { status: 400 })
+    return Response.json({ error: "Mes o configuración inválida" }, { status: 400 })
   }
 
   try {
     const minimumWage = await getMinimumWageForYear(prisma, Number(parsed.data.month.slice(0, 4)))
     const result = await prisma.$transaction(async (transaction) => {
-      for (const [rate, value] of Object.entries(parsed.data.rates)) {
-        const key = `socialSecurity.${rate}`
-        await transaction.appSetting.upsert({
-          where: { key },
-          create: { key, value },
-          update: { value },
-        })
-      }
+      const key = "socialSecurity.configuration"
+      await transaction.appSetting.upsert({
+        where: { key },
+        create: { key, value: parsed.data.configuration },
+        update: { value: parsed.data.configuration },
+      })
       return recalculateSocialSecurityPeriod(transaction, parsed.data.month, minimumWage)
     })
     return Response.json(result)

@@ -13,12 +13,11 @@ vi.mock("@/server/db", () => ({ prisma: prismaMock.prisma }))
 
 import { GET, PATCH } from "./route"
 
-const rates = [
-  { key: "socialSecurity.ibcRatePpm", value: 500_000 },
-  { key: "socialSecurity.healthRatePpm", value: 125_000 },
-  { key: "socialSecurity.pensionRatePpm", value: 160_000 },
-  { key: "socialSecurity.arlRatePpm", value: 24_360 },
-  { key: "socialSecurity.fundRatePpm", value: 10_000 },
+const settings = [
+  {
+    key: "socialSecurity.configuration",
+    value: { pensionEnabled: true, arlEnabled: true, arlRiskClass: "III", compensationFundEnabled: false },
+  },
   {
     key: "socialSecurity.minimumWageCop.2026",
     value: {
@@ -46,7 +45,7 @@ beforeEach(() => {
   prismaMock.prisma.invoice.findMany.mockResolvedValue([
     { grossAmount: 47_445.123, discountAmount: 16_824.665, shiftDiscountAmount: 0, netAmount: 30_620.458 },
   ])
-  prismaMock.prisma.appSetting.findMany.mockResolvedValue(rates)
+  prismaMock.prisma.appSetting.findMany.mockResolvedValue(settings)
   prismaMock.prisma.socialSecurityPeriod.upsert.mockImplementation(async ({ where, create, update }) => ({
     id: "period",
     ...create,
@@ -57,19 +56,28 @@ beforeEach(() => {
 })
 
 describe("social-security routes", () => {
-  it("calculates and persists one monthly period using configured rates", async () => {
+  it("calculates and persists one monthly period using derived configuration rates", async () => {
     const response = await GET(new Request("http://localhost/api/social-security?month=2026-09"))
     const result = await response.json()
 
     expect(response.status).toBe(200)
     expect(result).toMatchObject({
       month: "2026-09",
-      rates: { ibcRatePpm: 500_000 },
+      configuration: { pensionEnabled: true, arlEnabled: true, arlRiskClass: "III", compensationFundEnabled: false },
+      rates: {
+        ibcRatePpm: 400_000,
+        healthRatePpm: 125_000,
+        pensionRatePpm: 160_000,
+        arlRatePpm: 24_360,
+        fundRatePpm: 0,
+        solidarityRatePpm: 10_000,
+      },
       period: {
         grossAmount: 47_445.123,
         discounts: 16_824.665,
         netAmount: 30_620.458,
-        ibcAmount: 15_310.229,
+        ibcAmount: 12_248.183,
+        solidarityAmountTenths: 1_225,
       },
     })
     expect(prismaMock.prisma.invoice.findMany).toHaveBeenCalledWith(
@@ -102,28 +110,46 @@ describe("social-security routes", () => {
       healthAmountTenths: 2_189,
       pensionAmountTenths: 2_802,
       arlAmountTenths: 427,
-      fundAmountTenths: 176,
-      totalAmountTenths: 5_594,
+      fundAmountTenths: 0,
+      solidarityAmountTenths: 0,
+      totalAmountTenths: 5_418,
     })
   })
 
-  it("saves configurable rates and recalculates the selected month", async () => {
+  it("saves contribution options and recalculates the selected month", async () => {
     const response = await PATCH(
       jsonRequest({
         month: "2026-10",
-        rates: {
-          ...Object.fromEntries(rates.map(({ key, value }) => [key.split(".").at(-1), value])),
-          healthRatePpm: 130_000,
+        configuration: {
+          pensionEnabled: false,
+          arlEnabled: true,
+          arlRiskClass: "V",
+          compensationFundEnabled: true,
         },
       }),
     )
 
     expect(response.status).toBe(200)
-    expect(prismaMock.prisma.appSetting.upsert).toHaveBeenCalledTimes(5)
+    expect(prismaMock.prisma.appSetting.upsert).toHaveBeenCalledTimes(1)
     expect(prismaMock.prisma.appSetting.upsert).toHaveBeenCalledWith({
-      where: { key: "socialSecurity.healthRatePpm" },
-      create: { key: "socialSecurity.healthRatePpm", value: 130_000 },
-      update: { value: 130_000 },
+      where: { key: "socialSecurity.configuration" },
+      create: {
+        key: "socialSecurity.configuration",
+        value: {
+          pensionEnabled: false,
+          arlEnabled: true,
+          arlRiskClass: "V",
+          compensationFundEnabled: true,
+        },
+      },
+      update: {
+        value: {
+          pensionEnabled: false,
+          arlEnabled: true,
+          arlRiskClass: "V",
+          compensationFundEnabled: true,
+        },
+      },
     })
     expect(prismaMock.prisma.socialSecurityPeriod.upsert).toHaveBeenCalledWith(
       expect.objectContaining({ where: { month: new Date("2026-10-01T00:00:00.000Z") } }),

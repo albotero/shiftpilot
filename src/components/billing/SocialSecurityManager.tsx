@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent } from "react"
 import { Save } from "lucide-react"
-import type { SocialSecurityRates } from "@/lib/social-security/calculations"
+import type { ArlRiskClass, SocialSecurityConfiguration, SocialSecurityRates } from "@/lib/social-security/calculations"
 
 type Period = {
   grossAmount: number
@@ -13,49 +13,25 @@ type Period = {
   pensionAmountTenths: number
   arlAmountTenths: number
   fundAmountTenths: number
+  solidarityAmountTenths: number
   totalAmountTenths: number
 }
 
 type SocialSecurityResponse = {
   month: string
+  configuration: SocialSecurityConfiguration
   rates: SocialSecurityRates
   minimumWage: { year: number; sourceYear: number; amountCop: number; sourceUrl: string; stale: boolean }
   period: Period
 }
-type RateDraft = Record<keyof SocialSecurityRates, string>
-
-const rateFields: { key: keyof SocialSecurityRates; label: string }[] = [
-  { key: "ibcRatePpm", label: "IBC · %" },
-  { key: "healthRatePpm", label: "Salud · %" },
-  { key: "pensionRatePpm", label: "Pensión · %" },
-  { key: "arlRatePpm", label: "ARL · %" },
-  { key: "fundRatePpm", label: "Caja · %" },
-]
 
 function formatAmount(amount: number) {
   return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 3 }).format(amount)
 }
 
-function formatPesos(amountCop: number) {
-  return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(amountCop)
-}
-
-function toRateDraft(rates: SocialSecurityRates): RateDraft {
-  return Object.fromEntries(rateFields.map(({ key }) => [key, String(rates[key] / 10_000)])) as RateDraft
-}
-
-function fromRateDraft(draft: RateDraft): SocialSecurityRates | null {
-  if (rateFields.some(({ key }) => draft[key].trim() === "")) return null
-  const values = Object.fromEntries(
-    rateFields.map(({ key }) => [key, Number(draft[key]) * 10_000]),
-  ) as SocialSecurityRates
-  if (Object.values(values).some((value) => !Number.isInteger(value) || value < 0 || value > 1_000_000)) return null
-  return values
-}
-
 export function SocialSecurityManager({ month, refreshToken }: { month: string; refreshToken: number }) {
   const [result, setResult] = useState<SocialSecurityResponse | null>(null)
-  const [rateDraft, setRateDraft] = useState<RateDraft | null>(null)
+  const [configuration, setConfiguration] = useState<SocialSecurityConfiguration | null>(null)
   const [loadedMonth, setLoadedMonth] = useState("")
   const [loadError, setLoadError] = useState<{ month: string; message: string } | null>(null)
   const [saving, setSaving] = useState(false)
@@ -72,7 +48,7 @@ export function SocialSecurityManager({ month, refreshToken }: { month: string; 
         if (!response.ok) throw new Error(data.error ?? "No se pudo consultar seguridad social.")
         const parsed = data as SocialSecurityResponse
         setResult(parsed)
-        setRateDraft(toRateDraft(parsed.rates))
+        setConfiguration(parsed.configuration)
         setLoadError(null)
         setLoadedMonth(month)
       })
@@ -88,15 +64,9 @@ export function SocialSecurityManager({ month, refreshToken }: { month: string; 
     return () => controller.abort()
   }, [month, refreshToken])
 
-  async function saveRates(event: FormEvent<HTMLFormElement>) {
+  async function saveConfiguration(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    if (!rateDraft) return
-    const rates = fromRateDraft(rateDraft)
-    if (!rates) {
-      setError("Las tasas deben estar entre 0 y 100% y usar hasta tres decimales.")
-      return
-    }
-
+    if (!configuration) return
     setSaving(true)
     setError("")
     setMessage("")
@@ -104,20 +74,38 @@ export function SocialSecurityManager({ month, refreshToken }: { month: string; 
       const response = await fetch("/api/social-security", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ month, rates }),
+        body: JSON.stringify({ month, configuration }),
       })
       const data = await response.json()
-      if (!response.ok) throw new Error(data.error ?? "No se pudieron guardar las tasas.")
+      if (!response.ok) throw new Error(data.error ?? "No se pudo guardar la configuración.")
       const saved = data as SocialSecurityResponse
       setResult(saved)
-      setRateDraft(toRateDraft(saved.rates))
-      setMessage("Tasas guardadas y período recalculado.")
+      setConfiguration(saved.configuration)
+      setMessage("Configuración guardada y período recalculado.")
     } catch (saveError) {
-      setError(saveError instanceof Error ? saveError.message : "No se pudieron guardar las tasas.")
+      setError(saveError instanceof Error ? saveError.message : "No se pudo guardar la configuración.")
     } finally {
       setSaving(false)
     }
   }
+
+  const contributions = result
+    ? [
+        { label: "Salud", rate: result.rates.healthRatePpm, amount: result.period.healthAmountTenths },
+        { label: "Pensión", rate: result.rates.pensionRatePpm, amount: result.period.pensionAmountTenths },
+        {
+          label: `ARL · clase ${result.configuration.arlRiskClass}`,
+          rate: result.rates.arlRatePpm,
+          amount: result.period.arlAmountTenths,
+        },
+        { label: "Caja", rate: result.rates.fundRatePpm, amount: result.period.fundAmountTenths },
+        {
+          label: "Fondo de solidaridad",
+          rate: result.rates.solidarityRatePpm,
+          amount: result.period.solidarityAmountTenths,
+        },
+      ]
+    : []
 
   return (
     <section className="social-security-panel" aria-labelledby="social-security-title">
@@ -155,10 +143,13 @@ export function SocialSecurityManager({ month, refreshToken }: { month: string; 
           </dl>
 
           <p className="social-security-minimum-wage">
-            {result.minimumWage.stale
-              ? `Último SMMLV oficial verificado (${result.minimumWage.sourceYear})`
-              : `SMMLV ${result.minimumWage.year}`}
-            : <strong>{formatPesos(result.minimumWage.amountCop)} COP</strong>
+            <span>
+              {result.minimumWage.stale
+                ? `Último SMMLV oficial verificado (${result.minimumWage.sourceYear})`
+                : `SMMLV ${result.minimumWage.year}`}
+              :
+            </span>
+            <strong>{formatAmount(result.minimumWage.amountCop / 1000)} mil COP</strong>
             {result.minimumWage.stale && <span> · valor pendiente de actualizar con MinTrabajo</span>}
             <span aria-hidden="true"> · </span>
             <a href={result.minimumWage.sourceUrl} target="_blank" rel="noreferrer">
@@ -167,12 +158,7 @@ export function SocialSecurityManager({ month, refreshToken }: { month: string; 
           </p>
 
           <div className="social-security-contributions" aria-label="Aportes calculados">
-            {[
-              ["Salud", result.rates.healthRatePpm, result.period.healthAmountTenths],
-              ["Pensión", result.rates.pensionRatePpm, result.period.pensionAmountTenths],
-              ["ARL", result.rates.arlRatePpm, result.period.arlAmountTenths],
-              ["Caja", result.rates.fundRatePpm, result.period.fundAmountTenths],
-            ].map(([label, rate, amount]) => (
+            {contributions.map(({ label, rate, amount }) => (
               <div className="social-security-contribution" key={label}>
                 <span>{label}</span>
                 <span>{(Number(rate) / 10_000).toLocaleString("es-CO", { maximumFractionDigits: 3 })}%</span>
@@ -183,26 +169,67 @@ export function SocialSecurityManager({ month, refreshToken }: { month: string; 
         </>
       ) : null}
 
-      <form className="social-security-rates" onSubmit={saveRates}>
-        <h3>Tasas configurables</h3>
+      <form className="social-security-rates" onSubmit={saveConfiguration}>
+        <h3>Configuración de aportes</h3>
         <div className="social-security-rate-grid">
-          {rateFields.map(({ key, label }) => (
-            <label className="form-field" key={key}>
-              <span>{label}</span>
-              <input
-                type="number"
-                min="0"
-                max="100"
-                required
-                step="0.001"
-                value={rateDraft?.[key] ?? ""}
+          <label className="time-toggle social-security-option">
+            <input
+              type="checkbox"
+              checked={configuration?.pensionEnabled ?? false}
+              onChange={(event) =>
+                setConfiguration((current) =>
+                  current ? { ...current, pensionEnabled: event.target.checked } : current,
+                )
+              }
+            />
+            <span>Pago pensión · 16%</span>
+          </label>
+          <label className="time-toggle social-security-option">
+            <input
+              type="checkbox"
+              checked={configuration?.arlEnabled ?? false}
+              onChange={(event) =>
+                setConfiguration((current) => (current ? { ...current, arlEnabled: event.target.checked } : current))
+              }
+            />
+            <span>Pago ARL</span>
+          </label>
+          {configuration?.arlEnabled && (
+            <label className="form-field">
+              <span>Clase de riesgo ARL</span>
+              <select
+                value={configuration.arlRiskClass}
                 onChange={(event) =>
-                  setRateDraft((current) => (current ? { ...current, [key]: event.target.value } : current))
+                  setConfiguration((current) =>
+                    current ? { ...current, arlRiskClass: event.target.value as ArlRiskClass } : current,
+                  )
                 }
-              />
+              >
+                <option value="I">I · 0,522%</option>
+                <option value="II">II · 1,044%</option>
+                <option value="III">III · 2,436%</option>
+                <option value="IV">IV · 4,350%</option>
+                <option value="V">V · 6,960%</option>
+              </select>
             </label>
-          ))}
+          )}
+          <label className="time-toggle social-security-option">
+            <input
+              type="checkbox"
+              checked={configuration?.compensationFundEnabled ?? false}
+              onChange={(event) =>
+                setConfiguration((current) =>
+                  current ? { ...current, compensationFundEnabled: event.target.checked } : current,
+                )
+              }
+            />
+            <span>Pago caja de compensación · 2%</span>
+          </label>
         </div>
+        <p className="social-security-config-note">
+          IBC: 40% del neto, con piso de un SMMLV. Salud: 12,5%. Caja independiente integral: 2% cuando está activa.
+          Fondo de solidaridad: cálculo automático según IBC y SMMLV, solo si pagas pensión.
+        </p>
         {visibleError && (
           <p className="form-error" role="alert">
             {visibleError}
@@ -214,8 +241,8 @@ export function SocialSecurityManager({ month, refreshToken }: { month: string; 
           </p>
         )}
         <div className="invoice-form-actions">
-          <button type="submit" className="submit-button" disabled={saving || loading || !rateDraft}>
-            <Save size={15} /> {saving ? "Guardando…" : "Guardar tasas"}
+          <button type="submit" className="submit-button" disabled={saving || loading || !configuration}>
+            <Save size={15} /> {saving ? "Guardando…" : "Guardar configuración"}
           </button>
         </div>
       </form>
