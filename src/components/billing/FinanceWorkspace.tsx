@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { format } from "date-fns"
 import { InvoiceManager } from "@/components/billing/InvoiceManager"
+import { SocialSecurityManager } from "@/components/billing/SocialSecurityManager"
 import { PageHeading } from "@/components/dashboard/PageHeading"
 
 function formatAmount(amount: number) {
@@ -12,6 +13,7 @@ function formatAmount(amount: number) {
 export function FinanceWorkspace() {
   const [summary, setSummary] = useState({ count: 0, netAmount: 0 })
   const [month, setMonth] = useState(() => format(new Date(), "yyyy-MM"))
+  const [invoiceRevision, setInvoiceRevision] = useState(0)
 
   return (
     <>
@@ -36,7 +38,13 @@ export function FinanceWorkspace() {
           </div>
         }
       />
-      <InvoiceManager month={month} onSummaryChange={setSummary} onMonthChange={setMonth} />
+      <InvoiceManager
+        month={month}
+        onSummaryChange={setSummary}
+        onMonthChange={setMonth}
+        onInvoicesChanged={() => setInvoiceRevision((revision) => revision + 1)}
+      />
+      <SocialSecurityManager month={month} refreshToken={invoiceRevision} />
     </>
   )
 }

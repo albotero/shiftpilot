@@ -140,13 +140,10 @@ Guarda las copias fuera del volumen del servidor, protégelas como datos privado
 
 ## Alcance actual
 
-Implementado: calendario mensual, semanal y agenda; turnos Soma, reservas, eventos, vacaciones y cobertura; persistencia vía PostgreSQL con fallback local; facturación end-to-end con CRUD, partidas, cálculos por tipo, vencimientos y resumen mensual; cálculos base de IBC, seguridad social y deuda; carga del plan original y pruebas para sus reglas principales.
+Implementado: calendario mensual, semanal y agenda; turnos Soma, reservas, eventos, vacaciones y cobertura; persistencia vía PostgreSQL con fallback local; facturación end-to-end con CRUD, partidas, cálculos por tipo, vencimientos y resumen mensual; seguridad social mensual integrada con facturación, piso SMMLV consultado a MinTrabajo, tasas editables, redondeo por componente y persistencia idempotente; cálculos base de deuda y carga del plan original.
 
-Pendiente: integrar seguridad social con la facturación mensual, pagos reales/asignación de deuda, configuración editable y reportes. Los cálculos actuales de IBC y aportes son funciones base; todavía no se recalculan ni persisten automáticamente a partir de las facturas.
+Pendiente: pagos reales/asignación de deuda, reportes y auditoría final responsive/accesible. Seguridad social se recalcula con el CRUD de facturas y se persiste por mes.
 
-### Pruebas obligatorias para la Fase 9 — Seguridad social
+### Fase 9 — Seguridad social (CERRADA)
 
-- Verificar que el IBC mensual se derive del neto de las facturas del mismo mes después de descuentos, incluyendo facturas POS, prepagadas, particulares y Sedarte; comprobar que crear, editar o eliminar una factura actualiza el resultado una sola vez y no afecta otros meses.
-- Probar el IBC del 40% y cada aporte: salud 12.5%, pensión 16%, ARL 2.436% y caja 1%. Confirmar que las tasas configuradas se usan en el cálculo y que el redondeo hacia arriba se aplica por separado a cada componente.
-- Cubrir importes cero, valores que caen justo antes/en/después de un umbral de redondeo, netos pequeños y valores con descuentos o jornadas particulares; contrastar componente y total esperados.
-- Añadir pruebas de integración para lectura/configuración y persistencia del período mensual, y confirmar que recalcular no duplica aportes ni altera facturas o sus totales.
+Validado: IBC mensual sobre el neto final de facturas con piso igual al salario básico mínimo legal vigente (SMMLV), incluso cuando el neto mensual es cero; salud 12.5%, pensión 16%, ARL 2.436% y caja 1%, con redondeo independiente por componente. La API consulta la nota anual oficial de MinTrabajo en el primer uso de cada año y guarda el valor por año; si aún no se publica o falla la fuente, conserva el último valor verificado, lo marca como desactualizado y reintenta al día siguiente. Crear/editar/eliminar facturas recalcula sólo los meses afectados y el upsert no duplica períodos. Gates: lint, typecheck, 125 pruebas, build y Prisma validate; smoke CRUD productivo verificó el recálculo y limpió la factura temporal.

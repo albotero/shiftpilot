@@ -81,10 +81,12 @@ export function InvoiceManager({
   month,
   onSummaryChange,
   onMonthChange,
+  onInvoicesChanged,
 }: {
   month: string
   onSummaryChange: (summary: InvoiceSummary) => void
   onMonthChange: (month: string) => void
+  onInvoicesChanged: () => void
 }) {
   const [invoices, setInvoices] = useState<InvoiceRecord[]>([])
   const [calculationSettings, setCalculationSettings] = useState<BillingSettings>(DEFAULT_BILLING_SETTINGS)
@@ -290,6 +292,7 @@ export function InvoiceManager({
       setMessage(editingId ? "Factura actualizada." : "Factura creada.")
       resetForm()
       setRefreshToken((value) => value + 1)
+      onInvoicesChanged()
     } catch (saveError) {
       setError(errorMessage(saveError, "No se pudo guardar la factura."))
     } finally {
@@ -312,6 +315,7 @@ export function InvoiceManager({
       if (editingId === invoice.id) resetForm()
       setMessage("Factura eliminada.")
       setRefreshToken((value) => value + 1)
+      onInvoicesChanged()
     } catch (deleteError) {
       setError(errorMessage(deleteError, "No se pudo eliminar la factura."))
     }

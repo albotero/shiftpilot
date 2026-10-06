@@ -25,13 +25,10 @@ import {
   getMonthShiftHours,
   getMonthSomaShiftCount,
 } from "@/lib/calendar/utils"
-import {
-  getCalendarEntries,
-  getServerCalendarSnapshot,
-  subscribeToCalendar,
-} from "@/lib/calendar/storage"
+import { getCalendarEntries, getServerCalendarSnapshot, subscribeToCalendar } from "@/lib/calendar/storage"
 
 type InvoiceSummary = { count: number; netAmount: number }
+type SocialSecuritySummary = { ibcAmount: number }
 
 const availabilityLabels = {
   LIBRE: "Libre",
@@ -49,6 +46,7 @@ export function DashboardOverview() {
   const entries = useSyncExternalStore(subscribeToCalendar, getCalendarEntries, getServerCalendarSnapshot)
   const [activeDate] = useState(() => new Date())
   const [invoiceSummary, setInvoiceSummary] = useState<InvoiceSummary>({ count: 0, netAmount: 0 })
+  const [socialSecurity, setSocialSecurity] = useState<SocialSecuritySummary | null>(null)
   const activeMonth = format(activeDate, "yyyy-MM")
   const monthEntries = entries.filter((entry) => isSameMonth(new Date(`${entry.date}T12:00:00`), activeDate))
   const shiftCount = getMonthSomaShiftCount(monthEntries, activeDate)
@@ -69,6 +67,18 @@ export function DashboardOverview() {
         if (!response.ok) throw new Error("No se pudo consultar el resumen de facturación.")
         const result = (await response.json()) as { summary?: InvoiceSummary }
         if (result.summary) setInvoiceSummary(result.summary)
+      })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [activeMonth])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetch(`/api/social-security?month=${activeMonth}`, { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("No se pudo consultar el IBC del mes.")
+        const result = (await response.json()) as { period?: SocialSecuritySummary }
+        setSocialSecurity(result.period ?? null)
       })
       .catch(() => {})
     return () => controller.abort()
@@ -157,7 +167,8 @@ export function DashboardOverview() {
             </span>
           </div>
           <div className="stat-value stat-money">
-            —<small>miles COP</small>
+            {socialSecurity ? formatAmount(socialSecurity.ibcAmount) : "—"}
+            <small>miles COP</small>
           </div>
           <div className="stat-foot">
             <span className="stat-trend violet-text">
@@ -258,7 +269,7 @@ export function DashboardOverview() {
                               {format(new Date(`${conflict.date}T12:00:00`), "EEE d MMM", { locale: es })}
                             </time>
                             <span>
-                              {firstEntry ? getEntryLabel(firstEntry) : "Actividad"} · {" "}
+                              {firstEntry ? getEntryLabel(firstEntry) : "Actividad"} ·{" "}
                               {secondEntry ? getEntryLabel(secondEntry) : "Actividad"}
                             </span>
                           </Link>

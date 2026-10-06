@@ -2,9 +2,11 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 
 const prismaMock = vi.hoisted(() => ({
   prisma: {
-    invoice: { findMany: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
+    $transaction: vi.fn(),
+    invoice: { findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     work: { findUnique: vi.fn() },
     appSetting: { findMany: vi.fn() },
+    socialSecurityPeriod: { upsert: vi.fn() },
   },
 }))
 
@@ -20,6 +22,15 @@ const settings = [
   { key: "billing.particular.paymentDays", value: 30 },
   { key: "billing.particular.discountPpm", value: 120_000 },
   { key: "billing.particular.shiftAmount", value: 685 },
+  {
+    key: "socialSecurity.minimumWageCop.2026",
+    value: {
+      year: 2026,
+      amountCop: 1_750_905,
+      sourceUrl: "https://www.mintrabajo.gov.co/test-2026",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  },
 ]
 
 function jsonRequest(method: string, body: unknown) {
@@ -32,7 +43,12 @@ function jsonRequest(method: string, body: unknown) {
 
 beforeEach(() => {
   vi.resetAllMocks()
+  prismaMock.prisma.$transaction.mockImplementation(
+    async (operation: (transaction: typeof prismaMock.prisma) => Promise<unknown>) => operation(prismaMock.prisma),
+  )
+  prismaMock.prisma.invoice.findMany.mockResolvedValue([])
   prismaMock.prisma.appSetting.findMany.mockResolvedValue(settings)
+  prismaMock.prisma.socialSecurityPeriod.upsert.mockResolvedValue({})
   prismaMock.prisma.work.findUnique.mockImplementation(async ({ where }: { where: { name: string } }) => ({
     id: `${where.name.toLowerCase()}-work`,
     name: where.name,
@@ -41,6 +57,9 @@ beforeEach(() => {
 
 describe("invoice routes", () => {
   it("creates a POS invoice with separate shift discount and due date", async () => {
+    prismaMock.prisma.invoice.findMany.mockResolvedValue([
+      { grossAmount: 1000, discountAmount: 120, shiftDiscountAmount: 50, netAmount: 830 },
+    ])
     prismaMock.prisma.invoice.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       id: "invoice-pos",
       ...data,
@@ -82,9 +101,23 @@ describe("invoice routes", () => {
         include: { items: true },
       }),
     )
+    expect(prismaMock.prisma.socialSecurityPeriod.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { month: new Date("2026-10-01T00:00:00.000Z") },
+        create: expect.objectContaining({
+          grossAmount: 1000,
+          discounts: 170,
+          netAmount: 830,
+          ibcAmount: 1_750.905,
+        }),
+      }),
+    )
   })
 
   it("persists imported SOMA POS totals without recalculating PDF discounts", async () => {
+    prismaMock.prisma.invoice.findMany.mockResolvedValue([
+      { grossAmount: 47445.123, discountAmount: 16824.665, shiftDiscountAmount: 0, netAmount: 30620.458 },
+    ])
     prismaMock.prisma.invoice.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       id: "invoice-imported",
       ...data,
@@ -153,6 +186,17 @@ describe("invoice routes", () => {
         }),
       }),
     )
+    expect(prismaMock.prisma.socialSecurityPeriod.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { month: new Date("2026-09-01T00:00:00.000Z") },
+        create: expect.objectContaining({
+          grossAmount: 47445.123,
+          discounts: 16824.665,
+          netAmount: 30620.458,
+          ibcAmount: 12248.183,
+        }),
+      }),
+    )
   })
 
   it("filters invoice reads by service month", async () => {
@@ -211,6 +255,7 @@ describe("invoice routes", () => {
   })
 
   it("replaces invoice items on update and deletes the invoice", async () => {
+    prismaMock.prisma.invoice.findUnique.mockResolvedValue({ serviceDate: new Date("2026-09-07T00:00:00.000Z") })
     prismaMock.prisma.invoice.update.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       id: "invoice-sedarte",
       ...data,
@@ -232,6 +277,14 @@ describe("invoice routes", () => {
     )
 
     expect(response.status).toBe(200)
+    expect(prismaMock.prisma.socialSecurityPeriod.upsert).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({ where: { month: new Date("2026-09-01T00:00:00.000Z") } }),
+    )
+    expect(prismaMock.prisma.socialSecurityPeriod.upsert).toHaveBeenNthCalledWith(
+      2,
+      expect.objectContaining({ where: { month: new Date("2026-10-01T00:00:00.000Z") } }),
+    )
     expect(prismaMock.prisma.invoice.update).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { id: "invoice-sedarte" },
@@ -242,6 +295,10 @@ describe("invoice routes", () => {
     const deleted = await DELETE(jsonRequest("DELETE", { id: "invoice-sedarte" }))
     expect(deleted.status).toBe(200)
     expect(prismaMock.prisma.invoice.delete).toHaveBeenCalledWith({ where: { id: "invoice-sedarte" } })
+    expect(prismaMock.prisma.socialSecurityPeriod.upsert).toHaveBeenNthCalledWith(
+      3,
+      expect.objectContaining({ where: { month: new Date("2026-09-01T00:00:00.000Z") } }),
+    )
   })
 
   it("rejects invalid service-month filters", async () => {

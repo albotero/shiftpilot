@@ -1954,6 +1954,123 @@ a {
   background: #fff;
 }
 
+.social-security-panel {
+  display: grid;
+  gap: 15px;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #e3e8e1;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.social-security-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.social-security-heading h2 {
+  margin: 0;
+  color: #24332f;
+  font-size: 15px;
+  font-weight: 650;
+}
+
+.social-security-total {
+  color: #3e6745;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.social-security-summary,
+.social-security-contributions,
+.social-security-rate-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.social-security-summary {
+  margin: 0;
+}
+
+.social-security-summary div {
+  display: grid;
+  gap: 4px;
+}
+
+.social-security-summary dt,
+.social-security-contribution span {
+  color: #78837c;
+  font-size: 9px;
+}
+
+.social-security-summary dd {
+  margin: 0;
+  color: #34483b;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.social-security-minimum-wage {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px;
+  margin: -4px 0 0;
+  color: #68776d;
+  font-size: 9px;
+}
+
+.social-security-minimum-wage strong {
+  color: #34483b;
+  font-weight: 650;
+}
+
+.social-security-minimum-wage a {
+  margin-left: 5px;
+  color: #477449;
+  font-weight: 650;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.social-security-contributions {
+  padding-top: 12px;
+  border-top: 1px solid #e7ebe5;
+}
+
+.social-security-contribution {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 5px 10px;
+}
+
+.social-security-contribution strong {
+  grid-column: 1 / -1;
+  color: #34483b;
+  font-size: 13px;
+}
+
+.social-security-rates {
+  display: grid;
+  gap: 11px;
+  padding-top: 12px;
+  border-top: 1px solid #e7ebe5;
+}
+
+.social-security-rates h3 {
+  margin: 0;
+  color: #47574d;
+  font-size: 11px;
+}
+
+.social-security-rate-grid {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
 .finance-page-actions {
   display: flex;
   align-items: center;
@@ -2918,6 +3035,19 @@ a {
 
   .invoice-manager {
     padding: 12px;
+  }
+
+  .social-security-panel {
+    padding: 12px;
+  }
+
+  .social-security-summary,
+  .social-security-contributions {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .social-security-rate-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .finance-page-actions {

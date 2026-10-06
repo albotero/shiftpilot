@@ -8,7 +8,13 @@ export const DEFAULT_SOCIAL_SECURITY_RATES = {
   fundRatePpm: 10_000,
 } as const
 
-export type SocialSecurityRates = typeof DEFAULT_SOCIAL_SECURITY_RATES
+export type SocialSecurityRates = {
+  ibcRatePpm: number
+  healthRatePpm: number
+  pensionRatePpm: number
+  arlRatePpm: number
+  fundRatePpm: number
+}
 
 export type SocialSecurityBreakdown = {
   ibcAmount: number
@@ -19,7 +25,7 @@ export type SocialSecurityBreakdown = {
   totalAmountTenths: number
 }
 
-export function calculateIbc(netAmount: number, ibcRatePpm = DEFAULT_SOCIAL_SECURITY_RATES.ibcRatePpm) {
+export function calculateIbc(netAmount: number, ibcRatePpm: number = DEFAULT_SOCIAL_SECURITY_RATES.ibcRatePpm) {
   return percentageOf(netAmount, ibcRatePpm)
 }
 

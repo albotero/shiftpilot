@@ -8,6 +8,8 @@ import {
 } from "@/lib/billing/invoice-service"
 import { DEFAULT_BILLING_SETTINGS, type BillingSettings } from "@/lib/billing/calculations"
 import { addMoney, assertMoneyAmount } from "@/lib/money/integer"
+import { recalculateSocialSecurityPeriod } from "@/lib/social-security/period"
+import { getMinimumWageForYear, type MinimumWageSnapshot } from "@/lib/social-security/minimum-wage"
 import { prisma } from "@/server/db"
 
 export const dynamic = "force-dynamic"
@@ -15,6 +17,7 @@ export const dynamic = "force-dynamic"
 type InvoiceMutation = z.infer<typeof invoiceMutationSchema>
 type InvoiceWithItems = Prisma.InvoiceGetPayload<{ include: { items: true } }>
 type InvoiceRequestResult = { data: InvoiceMutation } | { response: Response }
+type BillingSettingsDatabase = Pick<Prisma.TransactionClient, "appSetting">
 
 function dateKey(date: Date | null) {
   return date?.toISOString().slice(0, 10) ?? null
@@ -49,8 +52,8 @@ function mapInvoice(invoice: InvoiceWithItems) {
   }
 }
 
-async function getBillingSettings() {
-  const records = await prisma.appSetting.findMany({ where: { key: { startsWith: "billing." } } })
+async function getBillingSettings(database: BillingSettingsDatabase = prisma) {
+  const records = await database.appSetting.findMany({ where: { key: { startsWith: "billing." } } })
   const values: Record<string, number> = {}
   for (const record of records) {
     if (typeof record.value !== "number" || record.value < 0) continue
@@ -76,8 +79,13 @@ async function getBillingSettings() {
   return { values, calculationSettings }
 }
 
-async function buildInvoiceData(input: InvoiceMutation, workId: string, replaceItems: boolean) {
-  const settings = await getBillingSettings()
+async function buildInvoiceData(
+  input: InvoiceMutation,
+  workId: string,
+  replaceItems: boolean,
+  database: BillingSettingsDatabase = prisma,
+) {
+  const settings = await getBillingSettings(database)
   const totals = calculateInvoiceAmounts(input, settings.calculationSettings)
   const dueDate = getExpectedPaymentDate(
     input.serviceDate,
@@ -193,9 +201,14 @@ export async function POST(request: Request) {
   try {
     const workId = await getWorkId(parsed.data.type)
     if (!workId) return Response.json({ error: "No se encontró el centro de trabajo" }, { status: 409 })
-    const invoice = await prisma.invoice.create({
-      data: await buildInvoiceData(parsed.data, workId, false),
-      include: { items: true },
+    const minimumWage = await getMinimumWageForYear(prisma, Number(parsed.data.serviceDate.slice(0, 4)))
+    const invoice = await prisma.$transaction(async (transaction) => {
+      const created = await transaction.invoice.create({
+        data: await buildInvoiceData(parsed.data, workId, false, transaction),
+        include: { items: true },
+      })
+      await recalculateSocialSecurityPeriod(transaction, parsed.data.serviceDate.slice(0, 7), minimumWage)
+      return created
     })
     return Response.json(mapInvoice(invoice), { status: 201 })
   } catch (error) {
@@ -214,11 +227,35 @@ export async function PATCH(request: Request) {
   try {
     const workId = await getWorkId(parsed.data.type)
     if (!workId) return Response.json({ error: "No se encontró el centro de trabajo" }, { status: 409 })
-    const invoice = await prisma.invoice.update({
+    const currentInvoice = await prisma.invoice.findUnique({
       where: { id: parsed.data.id },
-      data: await buildInvoiceData(parsed.data, workId, true),
-      include: { items: true },
+      select: { serviceDate: true },
     })
+    if (!currentInvoice) return Response.json({ error: "No se encontró la factura" }, { status: 404 })
+    const oldMonth = currentInvoice.serviceDate.toISOString().slice(0, 7)
+    const newMonth = parsed.data.serviceDate.slice(0, 7)
+    const affectedMonths = new Set([oldMonth, newMonth])
+    const minimumWages = new Map<string, MinimumWageSnapshot>()
+    for (const month of affectedMonths) {
+      minimumWages.set(month, await getMinimumWageForYear(prisma, Number(month.slice(0, 4))))
+    }
+    const invoice = await prisma.$transaction(async (transaction) => {
+      const existing = await transaction.invoice.findUnique({
+        where: { id: parsed.data.id },
+        select: { serviceDate: true },
+      })
+      if (!existing) return null
+      const updated = await transaction.invoice.update({
+        where: { id: parsed.data.id },
+        data: await buildInvoiceData(parsed.data, workId, true, transaction),
+        include: { items: true },
+      })
+      for (const month of affectedMonths) {
+        await recalculateSocialSecurityPeriod(transaction, month, minimumWages.get(month)!)
+      }
+      return updated
+    })
+    if (!invoice) return Response.json({ error: "No se encontró la factura" }, { status: 404 })
     return Response.json(mapInvoice(invoice))
   } catch (error) {
     if (isMissingRecord(error)) return Response.json({ error: "No se encontró la factura" }, { status: 404 })
@@ -240,7 +277,24 @@ export async function DELETE(request: Request) {
   if (!parsed.success) return Response.json({ error: "Identificador inválido" }, { status: 400 })
 
   try {
-    await prisma.invoice.delete({ where: { id: parsed.data.id } })
+    const currentInvoice = await prisma.invoice.findUnique({
+      where: { id: parsed.data.id },
+      select: { serviceDate: true },
+    })
+    if (!currentInvoice) return Response.json({ error: "No se encontró la factura" }, { status: 404 })
+    const month = currentInvoice.serviceDate.toISOString().slice(0, 7)
+    const minimumWage = await getMinimumWageForYear(prisma, Number(month.slice(0, 4)))
+    const deleted = await prisma.$transaction(async (transaction) => {
+      const existing = await transaction.invoice.findUnique({
+        where: { id: parsed.data.id },
+        select: { serviceDate: true },
+      })
+      if (!existing) return false
+      await transaction.invoice.delete({ where: { id: parsed.data.id } })
+      await recalculateSocialSecurityPeriod(transaction, month, minimumWage)
+      return true
+    })
+    if (!deleted) return Response.json({ error: "No se encontró la factura" }, { status: 404 })
     return Response.json({ deleted: true, id: parsed.data.id })
   } catch (error) {
     if (isMissingRecord(error)) return Response.json({ error: "No se encontró la factura" }, { status: 404 })

@@ -7,8 +7,12 @@ import {
 } from "@/lib/billing/calculations"
 import { calculateDebtSummary } from "@/lib/debt/calculations"
 import { getDebtPlanSnapshot } from "@/lib/debt/plan-snapshot"
-import { calculateIbc, calculateSocialSecurity } from "@/lib/social-security/calculations"
-import { assertMoneyAmount, percentageOf } from "@/lib/money/integer"
+import {
+  calculateIbc,
+  calculateSocialSecurity,
+  DEFAULT_SOCIAL_SECURITY_RATES,
+} from "@/lib/social-security/calculations"
+import { assertMoneyAmount, percentageOf, roundUpPercentageToScale } from "@/lib/money/integer"
 import { initialDebtSchedule } from "../../prisma/debt-schedule"
 
 describe("billing calculations in thousands of COP", () => {
@@ -67,6 +71,35 @@ describe("social security calculations", () => {
     expect(calculateIbc(47_445.123)).toBe(18_978.049)
     expect(percentageOf(47_445.123, 120_000)).toBe(5_693.415)
     expect(() => assertMoneyAmount(47_445.1234)).toThrow(/three decimals/i)
+  })
+
+  it("rounds contributions upward immediately across a tenth-thousand boundary", () => {
+    expect(roundUpPercentageToScale(7.999, 125_000, 10)).toBe(10)
+    expect(roundUpPercentageToScale(8, 125_000, 10)).toBe(10)
+    expect(roundUpPercentageToScale(8.001, 125_000, 10)).toBe(11)
+  })
+
+  it("applies the same before/on/after upward boundary to every contribution", () => {
+    const sameRateForEachComponent = {
+      ...DEFAULT_SOCIAL_SECURITY_RATES,
+      healthRatePpm: 125_000,
+      pensionRatePpm: 125_000,
+      arlRatePpm: 125_000,
+      fundRatePpm: 125_000,
+    }
+
+    for (const [ibc, expectedTenths] of [
+      [7.999, 10],
+      [8, 10],
+      [8.001, 11],
+    ] as const) {
+      const result = calculateSocialSecurity(ibc, sameRateForEachComponent)
+      expect(result.healthAmountTenths).toBe(expectedTenths)
+      expect(result.pensionAmountTenths).toBe(expectedTenths)
+      expect(result.arlAmountTenths).toBe(expectedTenths)
+      expect(result.fundAmountTenths).toBe(expectedTenths)
+      expect(result.totalAmountTenths).toBe(expectedTenths * 4)
+    }
   })
 })
 
