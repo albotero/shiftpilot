@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react"
 import { FilePlus2, FileUp, Pencil, Plus, Trash2, X } from "lucide-react"
+import { DateInput } from "@/components/forms/DateInput"
 import { DEFAULT_BILLING_SETTINGS, type BillingSettings } from "@/lib/billing/calculations"
 import { addMoney, roundMoneyAmount, subtractMoney } from "@/lib/money/integer"
 import { extractInvoiceTextFromPdf } from "@/lib/billing/pdf-reader"
@@ -12,6 +13,7 @@ import {
   type InvoiceMutation,
 } from "@/lib/billing/invoice-service"
 import { parseInvoicePdfText } from "@/lib/billing/pdf-import"
+import { formatDateDmy } from "@/lib/date-format"
 
 type InvoiceType = InvoiceMutation["type"]
 type InvoiceStatus = InvoiceMutation["status"]
@@ -68,10 +70,7 @@ function formatAmount(amount: number) {
 }
 
 function formatDate(date: string | null) {
-  if (!date) return "—"
-  return new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeZone: "UTC" }).format(
-    new Date(`${date}T12:00:00Z`),
-  )
+  return date ? formatDateDmy(date) : "—"
 }
 
 function errorMessage(value: unknown, fallback: string) {
@@ -366,13 +365,13 @@ export function InvoiceManager({
               ))}
             </select>
           </label>
-          <label className="form-field">
-            <span>Expedición</span>
-            <input
-              type="date"
+          <div className="form-field">
+            <label htmlFor="invoice-expedition-date">Expedición</label>
+            <DateInput
+              id="invoice-expedition-date"
+              ariaLabel="Expedición"
               value={invoiceDate}
-              onChange={(event) => {
-                const nextDate = event.target.value
+              onChange={(nextDate) => {
                 setInvoiceDate(nextDate)
                 if (nextDate) {
                   setServiceDate(nextDate)
@@ -382,15 +381,16 @@ export function InvoiceManager({
                 }
               }}
             />
-          </label>
-          <label className="form-field">
-            <span>Vencimiento · opcional</span>
-            <input
-              type="date"
+          </div>
+          <div className="form-field">
+            <label htmlFor="invoice-due-date">Vencimiento · opcional</label>
+            <DateInput
+              id="invoice-due-date"
+              ariaLabel="Vencimiento"
               value={expectedPaymentDateOverride}
-              onChange={(event) => setExpectedPaymentDateOverride(event.target.value)}
+              onChange={setExpectedPaymentDateOverride}
             />
-          </label>
+          </div>
           {type === "SOMA_POS" && pdfReportedTotal === null && (
             <label className="form-field">
               <span>Descuento de turnos · miles COP</span>
@@ -597,8 +597,7 @@ export function InvoiceManager({
             <thead>
               <tr>
                 <th>Factura</th>
-                <th>Servicio</th>
-                <th>Tipo</th>
+                <th>Institución o unidad</th>
                 <th>Factura / vence</th>
                 <th className="amount-column">Neto</th>
                 <th />
@@ -608,7 +607,6 @@ export function InvoiceManager({
               {invoices.map((invoice) => (
                 <tr key={invoice.id}>
                   <td>{invoice.invoiceNumber ?? "—"}</td>
-                  <td>{formatDate(invoice.serviceDate)}</td>
                   <td>{typeLabels[invoice.type]}</td>
                   <td>
                     {formatDate(invoice.invoiceDate)} / {formatDate(invoice.expectedPaymentDate)}

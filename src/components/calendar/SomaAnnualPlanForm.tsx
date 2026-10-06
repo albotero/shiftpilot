@@ -2,6 +2,7 @@
 
 import { useState, type FormEvent } from "react"
 import { CalendarRange, Save } from "lucide-react"
+import { DateInput } from "@/components/forms/DateInput"
 import { refreshCalendar } from "@/lib/calendar/storage"
 import type { SomaStatus } from "@/lib/calendar/types"
 
@@ -120,23 +121,36 @@ export function SomaAnnualPlanForm() {
               required
             />
           </label>
-          <label className="form-field">
-            <span>Inicio de secuencia principal</span>
-            <input
-              type="date"
+          <div className="form-field">
+            <label htmlFor="annual-plan-start-date">Inicio de secuencia principal</label>
+            <DateInput
+              id="annual-plan-start-date"
+              ariaLabel="Inicio de secuencia principal"
               value={mainStartDate}
-              onChange={(event) => setMainStartDate(event.target.value)}
+              onChange={setMainStartDate}
               required
             />
-          </label>
-          <label className="form-field">
-            <span>Fin de secuencia principal</span>
-            <input type="date" value={mainEndDate} onChange={(event) => setMainEndDate(event.target.value)} required />
-          </label>
-          <label className="form-field">
-            <span>Fecha ancla de la rotación</span>
-            <input type="date" value={anchorDate} onChange={(event) => setAnchorDate(event.target.value)} required />
-          </label>
+          </div>
+          <div className="form-field">
+            <label htmlFor="annual-plan-end-date">Fin de secuencia principal</label>
+            <DateInput
+              id="annual-plan-end-date"
+              ariaLabel="Fin de secuencia principal"
+              value={mainEndDate}
+              onChange={setMainEndDate}
+              required
+            />
+          </div>
+          <div className="form-field">
+            <label htmlFor="annual-plan-anchor-date">Fecha ancla de la rotación</label>
+            <DateInput
+              id="annual-plan-anchor-date"
+              ariaLabel="Fecha ancla de la rotación"
+              value={anchorDate}
+              onChange={setAnchorDate}
+              required
+            />
+          </div>
           <label className="form-field">
             <span>Estado en la fecha ancla</span>
             <select

@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react"
 import Link from "next/link"
 import { RotateCcw, Trash2, X } from "lucide-react"
+import { DateInput } from "@/components/forms/DateInput"
 import { calendarEntrySchema } from "@/lib/calendar/schema"
 import { toDateKey } from "@/lib/calendar/utils"
 import { getVacationEndDate, getVacationWeekCount } from "@/lib/calendar/vacation-weeks"
@@ -408,18 +409,16 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
 
           {kind === "VACACIONES" ? (
             <div className="form-row">
-              <label className="form-field">
-                <span>Fecha inicial</span>
-                <input
-                  type="date"
+              <div className="form-field">
+                <label htmlFor="vacation-start-date">Fecha inicial</label>
+                <DateInput
+                  id="vacation-start-date"
+                  ariaLabel="Fecha inicial"
                   value={date}
-                  onChange={(event) => {
-                    const nextDate = event.target.value
-                    setDate(nextDate)
-                  }}
+                  onChange={setDate}
                   required
                 />
-              </label>
+              </div>
               <label className="form-field">
                 <span>Semanas completas</span>
                 <input
@@ -434,10 +433,11 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
                   required
                 />
               </label>
-              <label className="form-field vacation-calculated-end">
-                <span>Fecha final calculada</span>
-                <input
-                  type="date"
+              <div className="form-field vacation-calculated-end">
+                <label htmlFor="vacation-end-date">Fecha final calculada</label>
+                <DateInput
+                  id="vacation-end-date"
+                  ariaLabel="Fecha final calculada"
                   value={
                     date && Number.isInteger(vacationWeeks) && vacationWeeks > 0
                       ? getVacationEndDate(date, vacationWeeks)
@@ -445,14 +445,14 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
                   }
                   readOnly
                 />
-              </label>
+              </div>
             </div>
           ) : (
             <div className="form-row">
-              <label className="form-field">
-                <span>Fecha</span>
-                <input type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
-              </label>
+              <div className="form-field">
+                <label htmlFor="calendar-entry-date">Fecha</label>
+                <DateInput id="calendar-entry-date" ariaLabel="Fecha" value={date} onChange={setDate} required />
+              </div>
               {kind !== "SOMA" && (
                 <label className="form-field">
                   <span>Lugar · opcional</span>

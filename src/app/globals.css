@@ -2353,6 +2353,56 @@ a {
   resize: vertical;
 }
 
+.date-input-control {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 38px;
+  align-items: center;
+  gap: 5px;
+}
+
+.date-input-control > input[type="text"] {
+  min-width: 0;
+}
+
+.date-input-picker {
+  display: grid;
+  width: 38px;
+  min-height: 38px;
+  place-items: center;
+  border: 1px solid #dfe5dd;
+  border-radius: 5px;
+  background: #fff;
+  color: #52645a;
+  cursor: pointer;
+}
+
+.date-input-picker:focus-visible {
+  outline: 2px solid #7da26f;
+  outline-offset: 2px;
+}
+
+.date-input-picker:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.date-input-control > .date-input-native {
+  position: absolute;
+  top: 50%;
+  right: 42px;
+  width: 1px;
+  min-height: 1px;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.date-input-control > input[aria-invalid="true"] {
+  border-color: #b64e3f;
+}
+
 .time-toggle {
   display: inline-flex;
   align-items: center;
