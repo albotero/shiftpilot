@@ -17,7 +17,7 @@ import {
 } from "lucide-react"
 import { DebtSummaryCard } from "@/components/debt/DebtSummaryCard"
 import { PageHeading } from "@/components/dashboard/PageHeading"
-import { findScheduleConflicts, getDayAvailability, somaShiftWindows } from "@/lib/calendar/availability"
+import { findScheduleConflicts, somaShiftWindows } from "@/lib/calendar/availability"
 import {
   formatLongDate,
   getEntryLabel,
@@ -29,14 +29,6 @@ import { getCalendarEntries, getServerCalendarSnapshot, subscribeToCalendar } fr
 
 type InvoiceSummary = { count: number; netAmount: number }
 type SocialSecuritySummary = { ibcAmount: number }
-
-const availabilityLabels = {
-  LIBRE: "Libre",
-  RESERVA: "Reserva Soma",
-  OCUPADO: "Turno",
-  EVENTO: "Evento en agenda",
-  VACACIONES: "Vacaciones",
-} as const
 
 function formatAmount(amount: number) {
   return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(amount)
@@ -52,11 +44,16 @@ export function DashboardOverview() {
   const shiftCount = getMonthSomaShiftCount(monthEntries, activeDate)
   const eventCount = monthEntries.filter((entry) => entry.kind === "SEDARTE" || entry.kind === "PERSONAL").length
   const shiftHours = getMonthShiftHours(entries, activeDate)
-  const todayAvailability = getDayAvailability(entries, format(new Date(), "yyyy-MM-dd"))
+  const todayKey = format(activeDate, "yyyy-MM-dd")
+  const todayEntries = entries.filter((entry) => entry.date === todayKey)
+  const todaySomaEntries = todayEntries.filter((entry) => entry.kind === "SOMA")
+  const todayShiftCount = getMonthSomaShiftCount(todaySomaEntries, activeDate)
+  const todayShiftHours = getMonthShiftHours(todaySomaEntries, activeDate)
+  const todayEventCount = todayEntries.filter((entry) => entry.kind === "SEDARTE" || entry.kind === "PERSONAL").length
   const scheduleConflicts = findScheduleConflicts(entries, somaShiftWindows)
   const entriesById = new Map(entries.map((entry) => [entry.id, entry]))
   const upcomingEntries = entries
-    .filter((entry) => entry.date >= format(new Date(), "yyyy-MM-dd"))
+    .filter((entry) => entry.date >= todayKey)
     .sort((left, right) => left.date.localeCompare(right.date))
     .slice(0, 4)
 
@@ -180,72 +177,28 @@ export function DashboardOverview() {
       </section>
 
       <div className="dashboard-columns overview-columns">
-        <section className="rail-section upcoming-section" id="week-ahead">
-          <div className="rail-heading">
-            <div>
-              <p className="eyebrow">Lo que viene</p>
-              <h2>Próximos días</h2>
-            </div>
-          </div>
-          {upcomingEntries.length ? (
-            <div className="upcoming-list">
-              {upcomingEntries.map((entry) => (
-                <div className="upcoming-item" key={entry.id}>
-                  <span className={`upcoming-mark ${getEntryTone(entry)}`} />
-                  <div className="upcoming-copy">
-                    <strong>{getEntryLabel(entry)}</strong>
-                    <span>
-                      {formatLongDate(new Date(`${entry.date}T12:00:00`))}
-                      {entry.startTime ? ` · ${entry.startTime}` : entry.period ? ` · ${entry.period}` : ""}
-                    </span>
-                  </div>
-                  {entry.status === "TURNO" && <span className="busy-tag">Ocupado</span>}
-                  {entry.status?.startsWith("R") && <span className="reserve-tag">Reserva</span>}
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="empty-upcoming">
-              <span className="empty-calendar-icon">
-                <CalendarDays size={18} />
-              </span>
-              <p>Tu agenda está despejada.</p>
-              <Link href="/calendar?new=1">
-                Agregar actividad <ArrowUpRight size={13} />
-              </Link>
-            </div>
-          )}
-        </section>
-
-        <aside className="right-rail">
-          <section className="rail-section availability-section">
+        <div className="overview-primary-column">
+          <section className="rail-section today-summary-section">
             <div className="rail-heading">
               <div>
-                <p className="eyebrow">Estado de hoy</p>
-                <h2>Disponibilidad</h2>
+                <p className="eyebrow">Resumen de hoy</p>
+                <h2>Actividad programada</h2>
               </div>
               <span className="live-indicator">HOY</span>
             </div>
-            <div className="availability-status">
-              <span className={`availability-pulse ${todayAvailability.toLowerCase()}`} />
+            <div className="today-summary-metrics" aria-label="Carga de hoy">
               <div>
-                <strong>{availabilityLabels[todayAvailability]}</strong>
-                <span>Las reservas Soma no se marcan como disponibilidad libre.</span>
+                <strong>{todayShiftCount}</strong>
+                <span>Turnos</span>
               </div>
-            </div>
-            <div className="availability-legend">
-              <span>
-                <i className="legend-swatch shift" />
-                Ocupado
-              </span>
-              <span>
-                <i className="legend-swatch reservation" />
-                Reserva
-              </span>
-              <span>
-                <i className="legend-swatch vacation" />
-                Vacaciones
-              </span>
+              <div>
+                <strong>{todayShiftHours} h</strong>
+                <span>Horas de turno</span>
+              </div>
+              <div>
+                <strong>{todayEventCount}</strong>
+                <span>Eventos</span>
+              </div>
             </div>
             {scheduleConflicts.length > 0 && (
               <div className="conflict-notice" role="status">
@@ -278,8 +231,43 @@ export function DashboardOverview() {
               </div>
             )}
           </section>
-          <DebtSummaryCard showDetailsLink />
-        </aside>
+
+          <section className="rail-section upcoming-section" id="week-ahead">
+            <div className="rail-heading">
+              <div>
+                <p className="eyebrow">Lo que viene</p>
+                <h2>Próximos días</h2>
+              </div>
+            </div>
+            {upcomingEntries.length ? (
+              <div className="upcoming-list">
+                {upcomingEntries.map((entry) => (
+                  <div className="upcoming-item" key={entry.id}>
+                    <span className={`upcoming-mark ${getEntryTone(entry)}`} />
+                    <div className="upcoming-copy">
+                      <strong>{getEntryLabel(entry)}</strong>
+                      <span>
+                        {formatLongDate(new Date(`${entry.date}T12:00:00`))}
+                        {entry.startTime ? ` · ${entry.startTime}` : entry.period ? ` · ${entry.period}` : ""}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="empty-upcoming">
+                <span className="empty-calendar-icon">
+                  <CalendarDays size={18} />
+                </span>
+                <p>Tu agenda está despejada.</p>
+                <Link href="/calendar?new=1">
+                  Agregar actividad <ArrowUpRight size={13} />
+                </Link>
+              </div>
+            )}
+          </section>
+        </div>
+        <DebtSummaryCard showDetailsLink />
       </div>
     </>
   )

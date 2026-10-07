@@ -615,6 +615,13 @@ a {
   grid-template-columns: minmax(280px, 0.72fr) minmax(0, 1fr);
 }
 
+.overview-primary-column {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 12px;
+}
+
 .calendar-panel,
 .rail-section {
   border: 1px solid #e3e8e1;
@@ -1192,47 +1199,6 @@ a {
   color: #4e4484;
 }
 
-.entry-dot.reservation-r1,
-.upcoming-mark.reservation-r1,
-.day-entry.reservation-r1 {
-  background: #7d68b6;
-}
-
-.entry-dot.reservation-r2,
-.upcoming-mark.reservation-r2,
-.day-entry.reservation-r2 {
-  background: #9b85c8;
-}
-
-.entry-dot.reservation-r3,
-.upcoming-mark.reservation-r3,
-.day-entry.reservation-r3 {
-  background: #ac99d3;
-}
-
-.entry-dot.reservation-r4,
-.upcoming-mark.reservation-r4,
-.day-entry.reservation-r4 {
-  background: #bbaadc;
-}
-
-.entry-dot.reservation-r5,
-.upcoming-mark.reservation-r5,
-.day-entry.reservation-r5 {
-  background: #c6b9e3;
-}
-
-.day-entry.reservation-r1 {
-  color: #fff;
-}
-
-.day-entry.reservation-r2,
-.day-entry.reservation-r3,
-.day-entry.reservation-r4,
-.day-entry.reservation-r5 {
-  color: var(--ink);
-}
-
 .day-entry.sedarte {
   background: #d8f0fa;
   color: #276d88;
@@ -1496,26 +1462,6 @@ a {
   background: var(--lilac);
 }
 
-.upcoming-mark.reservation-r1 {
-  background: #7d68b6;
-}
-
-.upcoming-mark.reservation-r2 {
-  background: #9b85c8;
-}
-
-.upcoming-mark.reservation-r3 {
-  background: #ac99d3;
-}
-
-.upcoming-mark.reservation-r4 {
-  background: #bbaadc;
-}
-
-.upcoming-mark.reservation-r5 {
-  background: #c6b9e3;
-}
-
 .upcoming-mark.sedarte {
   background: var(--blue);
 }
@@ -1549,8 +1495,7 @@ a {
   text-transform: capitalize;
 }
 
-.busy-tag,
-.reserve-tag {
+.busy-tag {
   flex: 0 0 auto;
   margin-left: auto;
   padding: 3px 5px;
@@ -1558,11 +1503,6 @@ a {
   background: #e9eef9;
   color: #3e5b8a;
   font-size: 7px;
-}
-
-.reserve-tag {
-  background: #f0edfb;
-  color: #7163ae;
 }
 
 .empty-upcoming {
@@ -1598,78 +1538,40 @@ a {
   letter-spacing: 0.5px;
 }
 
-.availability-section {
+.today-summary-section {
   padding-bottom: 13px;
 }
 
-.availability-status {
-  display: flex;
-  gap: 9px;
-  padding: 10px;
-  border: 1px solid #edf0ea;
-  border-radius: 5px;
-  background: #fafbf9;
-}
-
-.availability-pulse {
-  width: 8px;
-  height: 8px;
-  flex: 0 0 auto;
-  margin-top: 3px;
-  border-radius: 50%;
-  background: #85bd66;
-  box-shadow: 0 0 0 3px #85bd661c;
-}
-
-.availability-pulse.ocupado,
-.availability-pulse.reserva {
-  background: var(--tomato);
-  box-shadow: 0 0 0 3px #ed745a20;
-}
-
-.availability-pulse.reserva {
-  background: var(--lilac);
-  box-shadow: 0 0 0 3px #a294e520;
-}
-
-.availability-pulse.evento {
-  background: var(--blue);
-  box-shadow: 0 0 0 3px #55a8cb20;
-}
-
-.availability-pulse.vacaciones {
-  background: var(--sun);
-  box-shadow: 0 0 0 3px #f1c95220;
-}
-
-.availability-pulse.sin_registro {
-  background: #a5aea8;
-  box-shadow: 0 0 0 3px #a5aea820;
-}
-
-.availability-status div {
+.today-summary-metrics {
   display: grid;
-  gap: 5px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 3px 0 12px;
+  border-bottom: 1px solid #edf0eb;
 }
 
-.availability-status strong {
-  color: #3d5f40;
-  font-size: 9px;
+.today-summary-metrics > div {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 4px;
 }
 
-.availability-status div span {
-  color: #8b948d;
+.today-summary-metrics > div + div {
+  padding-left: 10px;
+  border-left: 1px solid #edf0eb;
+}
+
+.today-summary-metrics strong {
+  color: #34483b;
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+  line-height: 1;
+}
+
+.today-summary-metrics span {
+  color: #7c8780;
   font-size: 8px;
-  line-height: 1.45;
-}
-
-.availability-legend {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-  margin-top: 12px;
-  color: #818b84;
-  font-size: 8px;
+  line-height: 1.35;
 }
 
 .conflict-notice {
