@@ -236,23 +236,29 @@ describe("invoice routes", () => {
     })
   })
 
-  it("returns calculation settings, payment terms, and a monthly net summary", async () => {
-    prismaMock.prisma.invoice.findMany.mockResolvedValue([])
-
-    const response = await GET(new Request("http://localhost/api/invoices?month=2026-10&includeMeta=true"))
-
+  it.each([
+    ["2024-02", "2024-02-01", "2024-03-01"],
+    ["2026-12", "2026-12-01", "2027-01-01"],
+  ])("queries the complete service month %s with an exclusive upper boundary", async (month, from, to) => {
+    const response = await GET(new Request(`http://localhost/api/invoices?month=${month}`))
     expect(response.status).toBe(200)
-    expect(await response.json()).toMatchObject({
-      invoices: [],
-      calculationSettings: {
-        posDiscountRatePpm: 120_000,
-        prepaidDiscountRatePpm: 200_000,
-        particularDiscountRatePpm: 120_000,
-        privateShiftAmount: 685,
-      },
-      paymentDays: { SOMA_POS: 90, SOMA_PREPAGADA: 60, SOMA_PARTICULAR: 30, SEDARTE: 0 },
-      summary: { count: 0, netAmount: 0 },
-    })
+    expect(prismaMock.prisma.invoice.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { serviceDate: { gte: new Date(`${from}T00:00:00.000Z`), lt: new Date(`${to}T00:00:00.000Z`) } },
+      }),
+    )
+  })
+
+  it.each([
+    { serviceDate: "2026-02-30", items: [{ description: "Servicio", quantity: 1, unitAmount: 1000 }] },
+    { serviceDate: "2026-10-01", items: [] },
+    { serviceDate: "2026-10-01", items: [{ description: "Servicio", quantity: 0, unitAmount: 1000 }] },
+  ])("rejects invalid invoice payloads without database writes: %j", async (payload) => {
+    const response = await POST(jsonRequest("POST", { type: "SEDARTE", status: "FACTURADA", ...payload }))
+    expect(response.status).toBe(400)
+    expect(prismaMock.prisma.$transaction).not.toHaveBeenCalled()
+    expect(prismaMock.prisma.invoice.create).not.toHaveBeenCalled()
+    expect(prismaMock.prisma.socialSecurityPeriod.upsert).not.toHaveBeenCalled()
   })
 
   it("replaces invoice items on update and deletes the invoice", async () => {

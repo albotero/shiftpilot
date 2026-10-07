@@ -22,6 +22,110 @@ const reservedShift: CalendarEntry = {
 }
 
 describe("calendar availability", () => {
+  it.each([
+    ["09:59", 1],
+    ["10:00", 0],
+    ["10:01", 0],
+  ])("checks adjacent timed events at %s without false conflicts", (startTime, expectedCount) => {
+    const first: CalendarEntry = {
+      id: "first-event",
+      date: "2026-10-05",
+      kind: "SEDARTE",
+      title: "Procedimiento",
+      startTime: "09:00",
+      durationHours: 1,
+    }
+    const second: CalendarEntry = { ...first, id: "second-event", kind: "PERSONAL", startTime }
+    expect(findScheduleConflicts([first, second])).toHaveLength(expectedCount)
+  })
+
+  it("carries a night shift across the year boundary without extending its end", () => {
+    const night: CalendarEntry = {
+      ...reservedShift,
+      id: "new-year-night",
+      date: "2026-12-31",
+      status: "NOCHE",
+      period: "NOCHE",
+    }
+    const event: CalendarEntry = {
+      id: "new-year-event",
+      date: "2027-01-01",
+      kind: "PERSONAL",
+      title: "Cita",
+      startTime: "06:59",
+      durationHours: 0.5,
+    }
+    expect(getDayAvailability([night], "2027-01-01")).toBe("OCUPADO")
+    expect(getDayAvailability([night], "2027-01-02")).toBe("LIBRE")
+    expect(findScheduleConflicts([night, event], somaShiftWindows)).toEqual([
+      { date: "2027-01-01", firstEntryId: night.id, secondEntryId: event.id, type: "HORARIO" },
+    ])
+    expect(findScheduleConflicts([night, { ...event, startTime: "07:00" }], somaShiftWindows)).toEqual([])
+    expect(getDayAvailability([{ ...night, status: "TURNO_OTRA_PERSONA" }], "2027-01-01")).toBe("LIBRE")
+  })
+
+  it("does not carry events ending at midnight into conflicts on the next day", () => {
+    const event: CalendarEntry = {
+      id: "late-event",
+      date: "2026-10-31",
+      kind: "SEDARTE",
+      title: "Procedimiento",
+      startTime: "23:00",
+      durationHours: 1,
+    }
+    const nextDay: CalendarEntry = {
+      id: "next-day-event",
+      date: "2026-11-01",
+      kind: "PERSONAL",
+      title: "Cita",
+      startTime: "00:00",
+      durationHours: 1,
+    }
+    expect(findScheduleConflicts([event, nextDay])).toEqual([])
+    expect(findScheduleConflicts([{ ...event, durationHours: 1.5 }, nextDay])).toEqual([
+      { date: "2026-11-01", firstEntryId: event.id, secondEntryId: nextDay.id, type: "HORARIO" },
+    ])
+  })
+
+  it.each(["SEDARTE", "PERSONAL"] as const)(
+    "marks overnight %s events as busy events on both affected dates",
+    (kind) => {
+      const event: CalendarEntry = {
+        id: "overnight-availability",
+        date: "2026-12-31",
+        kind,
+        title: "Evento nocturno",
+        startTime: "23:30",
+        durationHours: 1,
+      }
+      expect(getDayAvailability([event], "2026-12-31")).toBe("EVENTO")
+      expect(getDayAvailability([event], "2027-01-01")).toBe("EVENTO")
+      expect(getDayAvailability([event], "2027-01-02")).toBe("LIBRE")
+      expect(getDayAvailability([{ ...event, durationHours: 0.5 }], "2027-01-01")).toBe("LIBRE")
+    },
+  )
+
+  it("gives vacation priority over worked shifts and events regardless of input order", () => {
+    const vacation: CalendarEntry = {
+      id: "vacation-priority",
+      date: reservedShift.date,
+      endDate: reservedShift.date,
+      kind: "VACACIONES",
+      title: "VACACIONES",
+    }
+    const event: CalendarEntry = {
+      id: "event-priority",
+      date: reservedShift.date,
+      kind: "PERSONAL",
+      title: "Cita",
+    }
+    const entries = [reservedShift, vacation, event]
+    expect(getDayAvailability(entries, reservedShift.date)).toBe("VACACIONES")
+    expect(getDayAvailability([...entries].reverse(), reservedShift.date)).toBe("VACACIONES")
+    expect(getDayAvailability([event], reservedShift.date)).toBe("EVENTO")
+    expect(findScheduleConflicts([])).toEqual([])
+  })
+
   it("orders month and week day entries by actual start time", () => {
     const additionalAm: CalendarEntry = { ...reservedShift, status: "R5", period: "AM" }
     const sedarte: CalendarEntry = {

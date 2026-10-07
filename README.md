@@ -73,6 +73,18 @@ npm test
 npm run build
 ```
 
+### Alcance de las pruebas
+
+La auditoría de Fase 14 amplía las suites existentes de Vitest con fronteras de negocio:
+
+- Facturación: descuentos hasta neto cero, rechazo de excesos, cantidades inválidas y consultas mensuales en año bisiesto y cambio de año.
+- Deuda: liquidación exacta, exceso rechazado por la API, FIFO cronológico sin mutar entradas y parqueadero sin asignaciones a capital/intereses.
+- Seguridad social: piso del IBC, agregación antes de redondear, saltos de solidaridad y aportes desactivados.
+- Calendario: eventos contiguos sin solapamiento, medianoche, NOCHE entre años, prioridad de vacaciones y disponibilidad de eventos nocturnos.
+- APIs: rechazo de fechas/importes inválidos antes de escribir y recálculo de períodos afectados.
+
+Los tests de rutas simulan Prisma: no certifican migraciones, aislamiento de transacciones, concurrencia ni rollback sobre PostgreSQL real. Esa verificación requiere una base de prueba aislada; no ejecutar pruebas de escritura contra producción.
+
 Para cambiar el esquema durante el desarrollo, crea una migración con un nombre descriptivo:
 
 ```bash

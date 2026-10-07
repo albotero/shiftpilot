@@ -74,6 +74,67 @@ beforeEach(() => {
 })
 
 describe("debt payment routes", () => {
+  it.each([
+    { amount: -1, parkingAmount: 0 },
+    { amount: 0, parkingAmount: 0 },
+    { amount: 0.0001, parkingAmount: 0 },
+    { amount: 1, parkingAmount: 0.0001 },
+    { amount: 1, parkingAmount: -1 },
+    { amount: "1", parkingAmount: 0 },
+  ])("rejects invalid payment amounts before starting a transaction: %j", async (amounts) => {
+    const response = await POST(jsonRequest({ paidAt: "2026-10-07", ...amounts }))
+    expect(response.status).toBe(400)
+    expect(prismaMock.prisma.$transaction).not.toHaveBeenCalled()
+    expect(prismaMock.prisma.debtPayment.create).not.toHaveBeenCalled()
+  })
+
+  it("completes the plan with an exact payment and removes the next installment", async () => {
+    prismaMock.prisma.debtPayment.create.mockResolvedValueOnce({
+      id: "final-payment",
+      debtId: debt.id,
+      paidAt: new Date("2026-10-07T00:00:00.000Z"),
+      createdAt: new Date("2026-10-07T00:00:00.000Z"),
+      amount: 2000,
+      parkingAmount: 150,
+      notes: null,
+    })
+    const response = await POST(jsonRequest({ paidAt: "2026-10-07", amount: 2000, parkingAmount: 150 }))
+    expect(response.status).toBe(201)
+    expect(await response.json()).toMatchObject({
+      summary: { balanceAmount: 0, pendingInstallments: [], nextInstallment: null, parkingPaid: 150 },
+      nextInstallment: null,
+      unpaidInstallments: [],
+    })
+  })
+
+  it("persists parking-only payments without creating debt allocations", async () => {
+    prismaMock.prisma.debtPayment.create.mockResolvedValueOnce({
+      id: "parking-only",
+      debtId: debt.id,
+      paidAt: new Date("2026-10-07T00:00:00.000Z"),
+      createdAt: new Date("2026-10-07T00:00:00.000Z"),
+      amount: 0,
+      parkingAmount: 150,
+      notes: null,
+    })
+    const response = await POST(jsonRequest({ paidAt: "2026-10-07", amount: 0, parkingAmount: 150 }))
+    expect(response.status).toBe(201)
+    expect(await response.json()).toMatchObject({
+      summary: { balanceAmount: 2000, paymentsApplied: 0, parkingPaid: 150 },
+      payments: [{ id: "parking-only", allocations: [] }],
+    })
+    expect(prismaMock.prisma.debtPaymentAllocation.createMany).not.toHaveBeenCalled()
+  })
+
+  it.each(["2026-13", "1899", "9999", "not-a-year"])(
+    "rejects invalid parking year %s before reading the debt",
+    async (year) => {
+      const response = await GET(new Request(`http://localhost/api/debt/payments?year=${year}`))
+      expect(response.status).toBe(400)
+      expect(prismaMock.prisma.debt.findUnique).not.toHaveBeenCalled()
+    },
+  )
+
   it("records a payment, keeps parking separate, and persists FIFO allocation by payment", async () => {
     const response = await POST(
       jsonRequest({ paidAt: "2026-07-11", amount: 500, parkingAmount: 150, notes: "Transferencia" }),

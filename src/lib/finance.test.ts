@@ -67,9 +67,62 @@ describe("billing calculations in thousands of COP", () => {
       netAmount: 1086.418,
     })
   })
+
+  it("allows a zero POS net but rejects one peso of excessive discounts", () => {
+    expect(calculatePosInvoice(1000, 880).netAmount).toBe(0)
+    expect(() => calculatePosInvoice(1000, 880.001)).toThrow(RangeError)
+  })
+
+  it.each([-1, 0.5, Number.NaN, Number.POSITIVE_INFINITY])("rejects invalid private shift counts: %s", (count) => {
+    expect(() => calculateParticularInvoice(1000, count)).toThrow(RangeError)
+  })
+
+  it("supports zero service amounts without discounting private shifts", () => {
+    expect(calculatePosInvoice(0).netAmount).toBe(0)
+    expect(calculatePrepaidInvoice(0).netAmount).toBe(0)
+    expect(calculateSedarteInvoice(0).netAmount).toBe(0)
+    expect(calculateParticularInvoice(0, 2)).toMatchObject({
+      discountAmount: 0,
+      privateShiftAmount: 1370,
+      netAmount: 1370,
+    })
+  })
 })
 
 describe("social security calculations", () => {
+  it.each([
+    [4, 0, 10_000],
+    [16, 10_000, 12_000],
+    [17, 12_000, 14_000],
+    [18, 14_000, 16_000],
+    [19, 16_000, 18_000],
+    [20, 18_000, 20_000],
+  ])("checks solidarity immediately around %s minimum wages", (multiple, belowRate, thresholdRate) => {
+    const minimumWage = 1750.905
+    const threshold = Number((minimumWage * multiple).toFixed(3))
+    expect(getSolidarityRatePpm(threshold - 0.001, minimumWage, true)).toBe(belowRate)
+    expect(getSolidarityRatePpm(threshold, minimumWage, true)).toBe(thresholdRate)
+    expect(getSolidarityRatePpm(threshold + 0.001, minimumWage, true)).toBe(thresholdRate)
+    expect(getSolidarityRatePpm(threshold, minimumWage, false)).toBe(0)
+  })
+
+  it("keeps disabled pension, ARL and compensation fund contributions at zero", () => {
+    const rates = getCalculatedSocialSecurityRates(
+      { pensionEnabled: false, arlEnabled: false, arlRiskClass: "V", compensationFundEnabled: false },
+      40_000,
+      1750.905,
+    )
+    expect(calculateSocialSecurity(40_000, rates)).toEqual({
+      ibcAmount: 40_000,
+      healthAmount: 5000,
+      pensionAmount: 0,
+      arlAmount: 0,
+      fundAmount: 0,
+      solidarityAmount: 0,
+      totalAmount: 5000,
+    })
+  })
+
   it("calculates a 40% IBC without dropping pesos", () => {
     expect(calculateIbc(1000)).toBe(400)
     expect(calculateIbc(1001)).toBe(400.4)
@@ -191,6 +244,54 @@ describe("fixed debt schedule", () => {
       remainingBalance: 0,
     },
   ]
+
+  it.each([
+    [1999.999, 0.001, 2, [2]],
+    [2000, 0, null, []],
+    [2000.001, 0, null, []],
+  ] as const)("handles the final payment boundary at %s", (amount, balance, next, pending) => {
+    const result = calculateDebtSummary(schedule, [{ paidAt: "2024-06-05", amount, parkingAmount: 150 }], "2024-06-30")
+    expect(result).toMatchObject({
+      balanceAmount: balance,
+      paymentsApplied: amount,
+      parkingPaid: 150,
+      nextInstallment: next,
+      pendingInstallments: [...pending],
+    })
+    expect(result.principalPaid + result.interestPaid + result.unclassifiedPaid).toBe(Math.min(amount, 2000))
+  })
+
+  it("does not allocate parking-only payments or mutate the fixed plan", () => {
+    const original = structuredClone(schedule)
+    expect(
+      calculatePaymentAllocationsByPayment(schedule, [
+        { id: "parking-only", paidAt: "2024-05-05", amount: 0, parkingAmount: 150 },
+      ]),
+    ).toEqual([])
+    expect(calculateDebtSummary(schedule, [], "2024-04-30")).toMatchObject({
+      balanceAmount: 2000,
+      pendingInstallments: [],
+      nextInstallment: 1,
+    })
+    expect(schedule).toEqual(original)
+  })
+
+  it("allocates unsorted payments and installments chronologically without mutating inputs", () => {
+    const payments = [
+      { id: "later", paidAt: "2024-06-05", amount: 1500, parkingAmount: 0 },
+      { id: "earlier", paidAt: "2024-05-05", amount: 500, parkingAmount: 150 },
+    ]
+    const reversedSchedule = [...schedule].reverse()
+    const originalPayments = structuredClone(payments)
+    const allocations = calculatePaymentAllocationsByPayment(reversedSchedule, payments)
+    expect(allocations.map(({ paymentId, installment }) => ({ paymentId, installment }))).toEqual([
+      { paymentId: "earlier", installment: 1 },
+      { paymentId: "later", installment: 1 },
+      { paymentId: "later", installment: 2 },
+    ])
+    expect(payments).toEqual(originalPayments)
+    expect(reversedSchedule).toEqual([...schedule].reverse())
+  })
 
   it("excludes parking and never adds late interest to an overdue payment", () => {
     const result = calculateDebtSummary(

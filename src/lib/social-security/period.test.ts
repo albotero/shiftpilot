@@ -13,6 +13,42 @@ const minimumWage: MinimumWageSnapshot = {
 }
 
 describe("monthly social security period", () => {
+  it.each([
+    [4377.26, 1750.905],
+    [4377.263, 1750.905],
+    [4377.265, 1750.906],
+  ])("checks the IBC floor when monthly net is %s", (netAmount, expectedIbc) => {
+    const period = calculateSocialSecurityPeriod(
+      [{ grossAmount: netAmount, discountAmount: 0, shiftDiscountAmount: 0, netAmount }],
+      DEFAULT_SOCIAL_SECURITY_CONFIGURATION,
+      minimumWage.amount,
+      minimumWage.amount,
+    )
+    expect(period.ibcAmount).toBe(expectedIbc)
+  })
+
+  it("rounds IBC after aggregating invoice nets, not separately per invoice", () => {
+    const period = calculateSocialSecurityPeriod([
+      { grossAmount: 0.001, discountAmount: 0, shiftDiscountAmount: 0, netAmount: 0.001 },
+      { grossAmount: 0.001, discountAmount: 0, shiftDiscountAmount: 0, netAmount: 0.001 },
+    ])
+    expect(period).toMatchObject({ grossAmount: 0.002, netAmount: 0.002, ibcAmount: 0.001 })
+  })
+
+  it.each(["2026-00", "2026-13", "2026-1", "1899-12", "9999-01"])(
+    "rejects invalid period %s before accessing the database",
+    async (month) => {
+      const database = {
+        invoice: { findMany: vi.fn() },
+        appSetting: { findMany: vi.fn() },
+        socialSecurityPeriod: { findUnique: vi.fn(), upsert: vi.fn() },
+      } as unknown as SocialSecurityPeriodDatabase
+      await expect(recalculateSocialSecurityPeriod(database, month, minimumWage)).rejects.toThrow(RangeError)
+      expect(database.invoice.findMany).not.toHaveBeenCalled()
+      expect(database.socialSecurityPeriod.upsert).not.toHaveBeenCalled()
+    },
+  )
+
   it("uses final invoice net amounts after discounts and rounds each component", () => {
     const period = calculateSocialSecurityPeriod(
       [

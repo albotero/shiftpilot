@@ -50,7 +50,11 @@ function isNightCarryover(entry: CalendarEntry, date: string) {
 }
 
 export function getDayAvailability(entries: CalendarEntry[], date: string): AvailabilityState {
-  const dayEntries = entries.filter((entry) => includesDate(entry, date))
+  const dayEntries = entries.filter(
+    (entry) =>
+      includesDate(entry, date) ||
+      ((entry.kind === "SEDARTE" || entry.kind === "PERSONAL") && getIntervalsOnDate(entry, date, {}).length > 0),
+  )
   if (dayEntries.some((entry) => entry.kind === "VACACIONES")) return "VACACIONES"
   if (dayEntries.some((entry) => entry.kind === "SOMA" && entry.status && occupiedSomaStatuses.has(entry.status)))
     return "OCUPADO"
