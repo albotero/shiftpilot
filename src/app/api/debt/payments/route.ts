@@ -14,13 +14,15 @@ function validDateKey(value: string) {
   return !Number.isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value
 }
 
-const createPaymentSchema = z
-  .object({
-    paidAt: z.string().refine(validDateKey),
-    amount: z.number().finite().nonnegative(),
-    parkingAmount: z.number().finite().nonnegative().default(0),
-    notes: z.string().trim().max(500).optional(),
-  })
+const paymentFieldsSchema = z.object({
+  paidAt: z.string().refine(validDateKey),
+  amount: z.number().finite().nonnegative(),
+  parkingAmount: z.number().finite().nonnegative().default(0),
+  notes: z.string().trim().max(500).optional(),
+})
+const createPaymentSchema = paymentFieldsSchema.refine((payment) => payment.amount > 0 || payment.parkingAmount > 0)
+const updatePaymentSchema = paymentFieldsSchema
+  .extend({ id: z.string().min(1) })
   .refine((payment) => payment.amount > 0 || payment.parkingAmount > 0)
 
 const deletePaymentSchema = z.object({ id: z.string().min(1) })
@@ -245,6 +247,62 @@ export async function POST(request: Request) {
     return Response.json(result.body, { status: result.status })
   } catch {
     return Response.json({ error: "No se pudo guardar el pago" }, { status: 503 })
+  }
+}
+
+export async function PUT(request: Request) {
+  const parsedBody = await parseJson(request)
+  if (!parsedBody.ok) return parsedBody.response
+  const parsed = updatePaymentSchema.safeParse(parsedBody.body)
+  if (!parsed.success) return Response.json({ error: "Pago inválido" }, { status: 400 })
+  try {
+    assertMoneyAmount(parsed.data.amount)
+    assertMoneyAmount(parsed.data.parkingAmount)
+  } catch {
+    return Response.json({ error: "Los importes admiten máximo tres decimales en miles de COP" }, { status: 400 })
+  }
+
+  try {
+    const result = await prisma.$transaction(async (transaction) => {
+      const debt = await findDebt(transaction)
+      if (!debt) return { status: 404, body: { error: "No se encontró el plan de deuda" } }
+
+      const paymentToUpdate = debt.payments.find((payment) => payment.id === parsed.data.id)
+      if (!paymentToUpdate) return { status: 404, body: { error: "No se encontró el pago" } }
+
+      const schedule = toScheduleLines(debt)
+      const otherPayments = debt.payments.filter((payment) => payment.id !== parsed.data.id)
+      const summaryWithoutPayment = calculateDebtSummary(
+        schedule,
+        toPaymentLines({ ...debt, payments: otherPayments }),
+        getTodayInColombia(),
+      )
+      if (parsed.data.amount > summaryWithoutPayment.balanceAmount) {
+        return { status: 400, body: { error: "El pago supera el saldo programado pendiente" } }
+      }
+
+      const updatedPayment = await transaction.debtPayment.update({
+        where: { id: parsed.data.id },
+        data: {
+          paidAt: new Date(`${parsed.data.paidAt}T00:00:00.000Z`),
+          amount: parsed.data.amount,
+          parkingAmount: parsed.data.parkingAmount,
+          notes: parsed.data.notes || null,
+        },
+      })
+      const updatedDebt = {
+        ...debt,
+        payments: debt.payments.map((payment) => (payment.id === parsed.data.id ? updatedPayment : payment)),
+      }
+      await savePaymentAllocations(transaction, updatedDebt)
+      return {
+        status: 200,
+        body: await buildDebtLedger(transaction, updatedDebt, Number(parsed.data.paidAt.slice(0, 4))),
+      }
+    })
+    return Response.json(result.body, { status: result.status })
+  } catch {
+    return Response.json({ error: "No se pudo actualizar el pago" }, { status: 503 })
   }
 }
 

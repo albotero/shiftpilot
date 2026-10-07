@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import { Trash2 } from "lucide-react"
+import { Pencil, Trash2 } from "lucide-react"
 import type { DebtSummary } from "@/lib/debt/calculations"
 import { addMoney } from "@/lib/money/integer"
 
@@ -68,6 +68,7 @@ export function DebtPaymentsManager() {
   const [parkingAmount, setParkingAmount] = useState("")
   const [parkingRateAmount, setParkingRateAmount] = useState(0)
   const [parkingRateLoading, setParkingRateLoading] = useState(false)
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null)
   const [notes, setNotes] = useState("")
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -79,6 +80,7 @@ export function DebtPaymentsManager() {
       ? Math.round((ledger.summary.principalPaid / ledger.summary.principalTotal) * 1000) / 10
       : 0
   const hasUnpaidInstallments = Boolean(ledger?.unpaidInstallments.length)
+  const showPaymentForm = hasUnpaidInstallments || editingPaymentId !== null
 
   useEffect(() => {
     const controller = new AbortController()
@@ -134,16 +136,44 @@ export function DebtPaymentsManager() {
     setParkingAmount(String(parkingRateAmount * Math.min(Number(value), ledger.unpaidInstallments.length)))
   }
 
+  function editPayment(payment: DebtPaymentRecord) {
+    setEditingPaymentId(payment.id)
+    setInstallmentsCount("1")
+    setPaidAt(payment.paidAt)
+    setAmount(String(payment.amount))
+    setParkingAmount(String(payment.parkingAmount))
+    setNotes(payment.notes ?? "")
+    setError("")
+    setMessage("")
+  }
+
+  function cancelPaymentEdit() {
+    setEditingPaymentId(null)
+    setPaidAt(format(new Date(), "yyyy-MM-dd"))
+    setInstallmentsCount("1")
+    setAmount(ledger && hasUnpaidInstallments ? String(getInstallmentAmount(ledger, "1")) : "")
+    setParkingAmount(String(parkingRateAmount))
+    setNotes("")
+    setError("")
+  }
+
   async function savePayment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    const paymentId = editingPaymentId
     setSaving(true)
     setError("")
     setMessage("")
     try {
       const response = await fetch("/api/debt/payments", {
-        method: "POST",
+        method: paymentId ? "PUT" : "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ paidAt, amount: Number(amount), parkingAmount: Number(parkingAmount), notes }),
+        body: JSON.stringify({
+          ...(paymentId ? { id: paymentId } : {}),
+          paidAt,
+          amount: Number(amount),
+          parkingAmount: Number(parkingAmount),
+          notes,
+        }),
       })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error ?? "No se pudo guardar el pago.")
@@ -153,8 +183,13 @@ export function DebtPaymentsManager() {
       setAmount(updatedLedger.unpaidInstallments.length > 0 ? String(getInstallmentAmount(updatedLedger, "1")) : "")
       setInstallmentsCount("1")
       setParkingAmount(String(updatedLedger.parkingRateAmount))
+      setEditingPaymentId(null)
       setNotes("")
-      setMessage("Pago guardado y asignado por antigüedad. El parqueadero quedó separado.")
+      setMessage(
+        paymentId
+          ? "Pago actualizado y asignaciones recalculadas."
+          : "Pago guardado y asignado por antigüedad. El parqueadero quedó separado.",
+      )
     } catch (saveError) {
       setError(saveError instanceof Error ? saveError.message : "No se pudo guardar el pago.")
     } finally {
@@ -180,6 +215,7 @@ export function DebtPaymentsManager() {
       if (!response.ok) throw new Error(result.error ?? "No se pudo eliminar el pago.")
       const updatedLedger = result as DebtLedger
       setLedger(updatedLedger)
+      setEditingPaymentId(null)
       setInstallmentsCount("1")
       setAmount(updatedLedger.unpaidInstallments.length > 0 ? String(getInstallmentAmount(updatedLedger, "1")) : "")
       setParkingRateAmount(updatedLedger.parkingRateAmount)
@@ -201,9 +237,10 @@ export function DebtPaymentsManager() {
         </div>
       </div>
 
-      {hasUnpaidInstallments && (
+      {showPaymentForm && (
         <>
           <form className="debt-payment-form" onSubmit={savePayment}>
+            {editingPaymentId && <p className="debt-payment-editing">Editando pago del {formatPaymentDate(paidAt)}</p>}
             <label className="form-field">
               <span>Fecha del pago</span>
               <input
@@ -215,19 +252,21 @@ export function DebtPaymentsManager() {
                 required
               />
             </label>
-            <label className="form-field">
-              <span>Cuotas a cubrir</span>
-              <select
-                value={installmentsCount}
-                disabled={!ledger || ledger.unpaidInstallments.length === 0}
-                onChange={(event) => selectInstallments(event.target.value)}
-              >
-                <option value="1">1 cuota</option>
-                <option value="2" disabled={!ledger || ledger.unpaidInstallments.length < 2}>
-                  2 cuotas
-                </option>
-              </select>
-            </label>
+            {!editingPaymentId && (
+              <label className="form-field">
+                <span>Cuotas a cubrir</span>
+                <select
+                  value={installmentsCount}
+                  disabled={!ledger || ledger.unpaidInstallments.length === 0}
+                  onChange={(event) => selectInstallments(event.target.value)}
+                >
+                  <option value="1">1 cuota</option>
+                  <option value="2" disabled={!ledger || ledger.unpaidInstallments.length < 2}>
+                    2 cuotas
+                  </option>
+                </select>
+              </label>
+            )}
             <label className="form-field">
               <span>Abono a deuda · miles COP</span>
               <input
@@ -255,9 +294,20 @@ export function DebtPaymentsManager() {
               <span>Notas · opcional</span>
               <input maxLength={500} value={notes} onChange={(event) => setNotes(event.target.value)} />
             </label>
-            <button type="submit" className="submit-button debt-payment-submit" disabled={saving || parkingRateLoading}>
-              {saving ? "Guardando…" : "Registrar pago"}
-            </button>
+            <div className="debt-payment-form-actions">
+              <button
+                type="submit"
+                className="submit-button debt-payment-submit"
+                disabled={saving || parkingRateLoading}
+              >
+                {saving ? "Guardando…" : editingPaymentId ? "Guardar cambios" : "Registrar pago"}
+              </button>
+              {editingPaymentId && (
+                <button type="button" className="cancel-button" onClick={cancelPaymentEdit} disabled={saving}>
+                  Cancelar
+                </button>
+              )}
+            </div>
           </form>
           <p className="debt-payment-rule">
             FIFO: se cubren las cuotas pendientes más antiguas, interés y luego capital. Puedes registrar dos cuotas
@@ -292,8 +342,10 @@ export function DebtPaymentsManager() {
               <dd>{formatAmount(ledger.summary.balanceAmount)} mil</dd>
             </div>
             <div>
-              <dt>Pagos aplicados</dt>
-              <dd>{formatAmount(ledger.summary.paymentsApplied)} mil</dd>
+              <dt>Pagado real / plan fijo</dt>
+              <dd>
+                {formatAmount(ledger.summary.paymentsApplied)} / {formatAmount(ledger.summary.scheduledAmount)} mil
+              </dd>
             </div>
             <div>
               <dt>Capital pagado / total capital</dt>
@@ -331,16 +383,28 @@ export function DebtPaymentsManager() {
                     <strong className="debt-payment-record-total">
                       {formatAmount(addMoney(payment.amount, payment.parkingAmount))} mil
                     </strong>
-                    <button
-                      type="button"
-                      className="icon-button danger"
-                      aria-label={`Eliminar pago del ${formatPaymentDate(payment.paidAt)}`}
-                      title="Eliminar pago"
-                      disabled={saving}
-                      onClick={() => void deletePayment(payment)}
-                    >
-                      <Trash2 size={15} />
-                    </button>
+                    <div className="debt-payment-record-actions">
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label={`Editar pago del ${formatPaymentDate(payment.paidAt)}`}
+                        title="Editar pago"
+                        disabled={saving}
+                        onClick={() => editPayment(payment)}
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        type="button"
+                        className="icon-button danger"
+                        aria-label={`Eliminar pago del ${formatPaymentDate(payment.paidAt)}`}
+                        title="Eliminar pago"
+                        disabled={saving}
+                        onClick={() => void deletePayment(payment)}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </div>
                   <div className="debt-payment-record-totals">
                     <span>

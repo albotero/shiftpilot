@@ -5,14 +5,14 @@ const prismaMock = vi.hoisted(() => ({
     $transaction: vi.fn(),
     debt: { findUnique: vi.fn() },
     parkingRate: { findUnique: vi.fn() },
-    debtPayment: { create: vi.fn(), delete: vi.fn() },
+    debtPayment: { create: vi.fn(), update: vi.fn(), delete: vi.fn() },
     debtPaymentAllocation: { createMany: vi.fn(), deleteMany: vi.fn() },
   },
 }))
 
 vi.mock("@/server/db", () => ({ prisma: prismaMock.prisma }))
 
-import { DELETE, GET, POST } from "./route"
+import { DELETE, GET, POST, PUT } from "./route"
 
 const debt = {
   id: "debt-1",
@@ -68,6 +68,7 @@ beforeEach(() => {
     notes: "Transferencia",
   })
   prismaMock.prisma.debtPayment.delete.mockResolvedValue({})
+  prismaMock.prisma.debtPayment.update.mockResolvedValue({})
   prismaMock.prisma.debtPaymentAllocation.deleteMany.mockResolvedValue({ count: 0 })
   prismaMock.prisma.debtPaymentAllocation.createMany.mockResolvedValue({ count: 1 })
 })
@@ -214,6 +215,74 @@ describe("debt payment routes", () => {
       { installment: 1, interestAmount: 100, principalAmount: 900 },
       { installment: 2, interestAmount: 80, principalAmount: 420 },
     ])
+  })
+
+  it("updates a real payment and recalculates its FIFO allocation", async () => {
+    const existingPayment = {
+      id: "payment-to-edit",
+      debtId: debt.id,
+      paidAt: new Date("2026-07-10T00:00:00.000Z"),
+      amount: 500,
+      parkingAmount: 150,
+      notes: "Anterior",
+      createdAt: new Date("2026-07-10T00:00:00.000Z"),
+    }
+    const updatedPayment = {
+      ...existingPayment,
+      paidAt: new Date("2026-07-12T00:00:00.000Z"),
+      amount: 900,
+      parkingAmount: 175,
+      notes: "Corregido",
+    }
+    prismaMock.prisma.debt.findUnique.mockResolvedValue({ ...debt, payments: [existingPayment] })
+    prismaMock.prisma.debtPayment.update.mockResolvedValue(updatedPayment)
+
+    const response = await PUT(
+      jsonRequest(
+        { id: existingPayment.id, paidAt: "2026-07-12", amount: 900, parkingAmount: 175, notes: "Corregido" },
+        "PUT",
+      ),
+    )
+    const result = await response.json()
+
+    expect(response.status).toBe(200)
+    expect(prismaMock.prisma.debtPayment.update).toHaveBeenCalledWith({
+      where: { id: existingPayment.id },
+      data: {
+        paidAt: new Date("2026-07-12T00:00:00.000Z"),
+        amount: 900,
+        parkingAmount: 175,
+        notes: "Corregido",
+      },
+    })
+    expect(result.summary).toMatchObject({ balanceAmount: 1100, paymentsApplied: 900, parkingPaid: 175 })
+    expect(result.payments[0].allocations).toMatchObject([
+      { installment: 1, interestAmount: 100, principalAmount: 800, unclassifiedAmount: 0 },
+    ])
+  })
+
+  it("rejects an edited payment that exceeds the balance without updating it", async () => {
+    prismaMock.prisma.debt.findUnique.mockResolvedValue({
+      ...debt,
+      payments: [
+        {
+          id: "payment-to-edit",
+          debtId: debt.id,
+          paidAt: new Date("2026-07-10T00:00:00.000Z"),
+          amount: 500,
+          parkingAmount: 0,
+          notes: null,
+          createdAt: new Date("2026-07-10T00:00:00.000Z"),
+        },
+      ],
+    })
+
+    const response = await PUT(
+      jsonRequest({ id: "payment-to-edit", paidAt: "2026-07-12", amount: 2001, parkingAmount: 0 }, "PUT"),
+    )
+
+    expect(response.status).toBe(400)
+    expect(prismaMock.prisma.debtPayment.update).not.toHaveBeenCalled()
   })
 
   it("rejects invalid dates and payments above the remaining scheduled balance", async () => {
