@@ -79,6 +79,10 @@ export function DebtPaymentsManager() {
     ledger && ledger.summary.principalTotal > 0
       ? Math.round((ledger.summary.principalPaid / ledger.summary.principalTotal) * 1000) / 10
       : 0
+  const paidPlanPercentage =
+    ledger && ledger.summary.scheduledAmount > 0
+      ? Math.round((ledger.summary.paymentsApplied / ledger.summary.scheduledAmount) * 1000) / 10
+      : 0
   const principalBalance = ledger
     ? Math.max(0, subtractMoney(ledger.summary.principalTotal, ledger.summary.principalPaid))
     : 0
@@ -345,6 +349,7 @@ export function DebtPaymentsManager() {
               <dd>
                 {formatAmount(ledger.summary.paymentsApplied)} / {formatAmount(ledger.summary.scheduledAmount)} mil
               </dd>
+              <small>{formatAmount(paidPlanPercentage)}% pagado</small>
             </div>
             <div>
               <dt>Capital pagado / total capital</dt>
