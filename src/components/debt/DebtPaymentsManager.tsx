@@ -5,7 +5,7 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { Pencil, Trash2 } from "lucide-react"
 import type { DebtSummary } from "@/lib/debt/calculations"
-import { addMoney } from "@/lib/money/integer"
+import { addMoney, subtractMoney } from "@/lib/money/integer"
 
 type PaymentAllocation = {
   installment: number
@@ -79,6 +79,9 @@ export function DebtPaymentsManager() {
     ledger && ledger.summary.principalTotal > 0
       ? Math.round((ledger.summary.principalPaid / ledger.summary.principalTotal) * 1000) / 10
       : 0
+  const principalBalance = ledger
+    ? Math.max(0, subtractMoney(ledger.summary.principalTotal, ledger.summary.principalPaid))
+    : 0
   const hasUnpaidInstallments = Boolean(ledger?.unpaidInstallments.length)
   const showPaymentForm = hasUnpaidInstallments || editingPaymentId !== null
 
@@ -338,10 +341,6 @@ export function DebtPaymentsManager() {
         <>
           <dl className="debt-payment-summary">
             <div>
-              <dt>Saldo pendiente (capital + intereses)</dt>
-              <dd>{formatAmount(ledger.summary.balanceAmount)} mil</dd>
-            </div>
-            <div>
               <dt>Pagado real / plan fijo</dt>
               <dd>
                 {formatAmount(ledger.summary.paymentsApplied)} / {formatAmount(ledger.summary.scheduledAmount)} mil
@@ -355,19 +354,12 @@ export function DebtPaymentsManager() {
               <small>{formatAmount(capitalPaidPercentage)}% pagado</small>
             </div>
             <div>
-              <dt>Próxima transferencia</dt>
-              <dd>
-                {ledger.nextInstallment
-                  ? `${formatAmount(ledger.nextInstallment.totalTransferAmount)} mil`
-                  : "Plan completado"}
-              </dd>
-              {ledger.nextInstallment && (
-                <small>
-                  Cuota {formatAmount(ledger.nextInstallment.amount)} + parqueadero{" "}
-                  {formatAmount(ledger.nextInstallment.parkingAmount)} ·{" "}
-                  {formatPaymentMonth(ledger.nextInstallment.dueDate)}
-                </small>
-              )}
+              <dt>Saldo a capital</dt>
+              <dd>{formatAmount(principalBalance)} mil</dd>
+            </div>
+            <div>
+              <dt>Saldo pendiente (capital + intereses)</dt>
+              <dd>{formatAmount(ledger.summary.balanceAmount)} mil</dd>
             </div>
           </dl>
 

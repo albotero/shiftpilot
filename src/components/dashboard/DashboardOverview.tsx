@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react"
 import Link from "next/link"
-import { format, isSameMonth, startOfMonth } from "date-fns"
+import { format, isSameMonth } from "date-fns"
 import { es } from "date-fns/locale"
 import {
   Activity,
@@ -114,7 +114,9 @@ export function DashboardOverview() {
             <span className="stat-trend">
               <ArrowUpRight size={14} /> {shiftHours} h
             </span>
-            <span>en {format(startOfMonth(activeDate), "MMMM", { locale: es })}</span>
+            <Link className="stat-card-action" href="/calendar">
+              Ver calendario <ArrowUpRight size={12} />
+            </Link>
           </div>
         </article>
         <article className="stat-card stat-events">
@@ -132,7 +134,9 @@ export function DashboardOverview() {
             <span className="stat-trend blue-text">
               <Activity size={14} /> Agenda
             </span>
-            <span>Sedarte y personales</span>
+            <Link className="stat-card-action" href="/calendar">
+              Ver agenda <ArrowUpRight size={12} />
+            </Link>
           </div>
         </article>
         <article className="stat-card stat-billing">
@@ -153,7 +157,9 @@ export function DashboardOverview() {
                 ? "Sin facturas"
                 : `${invoiceSummary.count} factura${invoiceSummary.count === 1 ? "" : "s"}`}
             </span>
-            <span>en {format(startOfMonth(activeDate), "MMMM", { locale: es })}</span>
+            <Link className="stat-card-action" href="/finance#invoices">
+              Ver facturas <ArrowUpRight size={12} />
+            </Link>
           </div>
         </article>
         <article className="stat-card stat-ibc">
@@ -171,7 +177,9 @@ export function DashboardOverview() {
             <span className="stat-trend violet-text">
               <Check size={14} /> 40% neto
             </span>
-            <span>Tras descuentos</span>
+            <Link className="stat-card-action" href="/finance#social-security-title">
+              Ver aportes <ArrowUpRight size={12} />
+            </Link>
           </div>
         </article>
       </section>
