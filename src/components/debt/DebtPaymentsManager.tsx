@@ -54,6 +54,11 @@ function formatPaymentMonth(date: string) {
   return format(new Date(`${date}T12:00:00`), "MMMM yyyy", { locale: es })
 }
 
+function getInstallmentAmount(ledger: DebtLedger, value: string) {
+  const installments = ledger.unpaidInstallments.slice(0, Number(value))
+  return addMoney(...installments.map((installment) => installment.remainingAmount))
+}
+
 export function DebtPaymentsManager() {
   const [ledger, setLedger] = useState<DebtLedger | null>(null)
   const [paidAt, setPaidAt] = useState(() => format(new Date(), "yyyy-MM-dd"))
@@ -85,6 +90,7 @@ export function DebtPaymentsManager() {
           setLedger(currentLedger)
           setParkingRateAmount(currentLedger.parkingRateAmount)
           setParkingAmount(String(currentLedger.parkingRateAmount))
+          setAmount(String(getInstallmentAmount(currentLedger, "1")))
         }
       })
       .catch((loadError) => {
@@ -123,10 +129,8 @@ export function DebtPaymentsManager() {
   function selectInstallments(value: string) {
     setInstallmentsCount(value)
     if (!ledger) return
-    const count = Number(value)
-    const installments = ledger.unpaidInstallments.slice(0, count)
-    setAmount(String(addMoney(...installments.map((installment) => installment.remainingAmount))))
-    setParkingAmount(String(parkingRateAmount * installments.length))
+    setAmount(String(getInstallmentAmount(ledger, value)))
+    setParkingAmount(String(parkingRateAmount * Math.min(Number(value), ledger.unpaidInstallments.length)))
   }
 
   async function savePayment(event: FormEvent<HTMLFormElement>) {
