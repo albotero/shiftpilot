@@ -3,6 +3,7 @@
 import { useEffect, useState, type FormEvent } from "react"
 import { format } from "date-fns"
 import { CircleDollarSign, Save } from "lucide-react"
+import { MoneyInput } from "@/components/forms/MoneyInput"
 
 type ParkingRateResponse = { year: number; amount: number }
 
@@ -90,15 +91,7 @@ export function ParkingRateSettingsManager() {
           </label>
           <label className="form-field">
             <span>Valor por cuota · miles COP</span>
-            <input
-              type="number"
-              min="0"
-              step="0.001"
-              value={amount}
-              onChange={(event) => setAmount(event.target.value)}
-              required
-              disabled={loading}
-            />
+            <MoneyInput value={amount} onValueChange={setAmount} required disabled={loading} />
           </label>
         </div>
         {error && (

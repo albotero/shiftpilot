@@ -17,7 +17,22 @@ import {
   DEFAULT_SOCIAL_SECURITY_RATES,
 } from "@/lib/social-security/calculations"
 import { assertMoneyAmount, percentageOf, roundUpPercentageToScale } from "@/lib/money/integer"
+import { formatMoneyInput, parseMoneyInput } from "@/lib/money/input-format"
 import { initialDebtSchedule } from "../../prisma/debt-schedule"
+
+describe("localized money input", () => {
+  it("formats thousands with periods and decimal fractions with commas", () => {
+    expect(formatMoneyInput("1234567.89")).toBe("1.234.567,89")
+    expect(formatMoneyInput("1750.905")).toBe("1.750,905")
+  })
+
+  it("parses localized values back to dot-decimal amounts", () => {
+    expect(parseMoneyInput("1.234.567,89")).toBe("1234567.89")
+    expect(parseMoneyInput("1.750,905")).toBe("1750.905")
+    expect(parseMoneyInput("1234,5")).toBe("1234.5")
+    expect(parseMoneyInput("1.234,", true)).toBe("1234")
+  })
+})
 
 describe("billing calculations in thousands of COP", () => {
   it("keeps the POS day discount separate from the editable shift discount", () => {

@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { CircleDollarSign, Pencil, Save, Trash2, X } from "lucide-react"
+import { MoneyInput } from "@/components/forms/MoneyInput"
 import {
   DEFAULT_COVERED_SHIFT_RATE_THOUSANDS,
   DEFAULT_COVERED_SHIFT_RATE_HISTORY,
@@ -183,16 +184,7 @@ export function CoveredShiftRateSettingsManager() {
           <form className="coverage-rate-form" onSubmit={saveRate}>
             <label className="form-field">
               <span>Valor por jornada · miles COP</span>
-              <input
-                type="number"
-                inputMode="numeric"
-                min="0"
-                step="0.001"
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-                required
-                disabled={!ready}
-              />
+              <MoneyInput value={amount} onValueChange={setAmount} required disabled={!ready} />
             </label>
             <label className="form-field">
               <span>Entrada en vigor</span>

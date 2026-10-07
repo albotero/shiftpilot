@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { Pencil, Trash2 } from "lucide-react"
+import { MoneyInput } from "@/components/forms/MoneyInput"
 import type { DebtSummary } from "@/lib/debt/calculations"
 import { addMoney, subtractMoney } from "@/lib/money/integer"
 
@@ -276,26 +277,11 @@ export function DebtPaymentsManager() {
             )}
             <label className="form-field">
               <span>Abono a deuda · miles COP</span>
-              <input
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.001"
-                required
-                value={amount}
-                onChange={(event) => setAmount(event.target.value)}
-              />
+              <MoneyInput required value={amount} onValueChange={setAmount} />
             </label>
             <label className="form-field">
               <span>Parqueadero · miles COP</span>
-              <input
-                type="number"
-                inputMode="decimal"
-                min="0"
-                step="0.001"
-                value={parkingAmount}
-                onChange={(event) => setParkingAmount(event.target.value)}
-              />
+              <MoneyInput value={parkingAmount} onValueChange={setParkingAmount} />
             </label>
             <label className="form-field">
               <span>Notas · opcional</span>

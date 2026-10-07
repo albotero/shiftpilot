@@ -5,6 +5,7 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { FilePlus2, FileUp, Pencil, Plus, Trash2, X } from "lucide-react"
 import { DateInput } from "@/components/forms/DateInput"
+import { MoneyInput } from "@/components/forms/MoneyInput"
 import { DEFAULT_BILLING_SETTINGS, type BillingSettings } from "@/lib/billing/calculations"
 import { addMoney, roundMoneyAmount, subtractMoney } from "@/lib/money/integer"
 import { extractInvoiceTextFromPdf } from "@/lib/billing/pdf-reader"
@@ -392,13 +393,7 @@ export function InvoiceManager({
           {type === "SOMA_POS" && pdfReportedTotal === null && (
             <label className="form-field">
               <span>Descuento de turnos · miles COP</span>
-              <input
-                type="number"
-                min="0"
-                step="0.001"
-                value={shiftDiscountAmount}
-                onChange={(event) => setShiftDiscountAmount(event.target.value)}
-              />
+              <MoneyInput value={shiftDiscountAmount} onValueChange={setShiftDiscountAmount} />
             </label>
           )}
           {type === "SOMA_PARTICULAR" && pdfReportedTotal === null && (
@@ -462,17 +457,12 @@ export function InvoiceManager({
               </label>
               <label className="form-field">
                 <span>Valor unitario · miles COP</span>
-                <input
+                <MoneyInput
                   required
-                  type="number"
-                  min="0"
-                  step="0.001"
                   value={item.unitAmount}
-                  onChange={(event) =>
+                  onValueChange={(value) =>
                     setItems(
-                      items.map((current) =>
-                        current.key === item.key ? { ...current, unitAmount: event.target.value } : current,
-                      ),
+                      items.map((current) => (current.key === item.key ? { ...current, unitAmount: value } : current)),
                     )
                   }
                 />
@@ -480,15 +470,12 @@ export function InvoiceManager({
               {Number(item.discountAmount) > 0 && (
                 <label className="form-field invoice-item-discount">
                   <span>Descuento · miles COP</span>
-                  <input
-                    type="number"
-                    min="0"
-                    step="0.001"
+                  <MoneyInput
                     value={item.discountAmount}
-                    onChange={(event) =>
+                    onValueChange={(value) =>
                       setItems(
                         items.map((current) =>
-                          current.key === item.key ? { ...current, discountAmount: event.target.value } : current,
+                          current.key === item.key ? { ...current, discountAmount: value } : current,
                         ),
                       )
                     }
@@ -553,12 +540,9 @@ export function InvoiceManager({
         {pdfReportedTotal !== null && (
           <label className="form-field pdf-total-field">
             <span>Total a pagar del PDF · miles COP</span>
-            <input
-              type="number"
-              min="0"
-              step="0.001"
-              value={pdfReportedTotal}
-              onChange={(event) => setPdfReportedTotal(event.target.value === "" ? null : Number(event.target.value))}
+            <MoneyInput
+              value={pdfReportedTotal === null ? "" : String(pdfReportedTotal)}
+              onValueChange={(value) => setPdfReportedTotal(value === "" ? null : Number(value))}
             />
           </label>
         )}
