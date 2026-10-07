@@ -761,6 +761,10 @@ a {
   font-weight: 700;
 }
 
+.coverage-summary-table tfoot th {
+  text-align: left;
+}
+
 .coverage-summary-empty {
   margin: 0;
   padding: 12px 0 2px;
@@ -3610,6 +3614,59 @@ a {
 .mobile-menu-button,
 .mobile-bottom-nav {
   display: none;
+}
+
+@media (min-width: 1024px) {
+  .dashboard-content {
+    --desktop-page-width: 1280px;
+    --desktop-data-width: 1080px;
+    --desktop-settings-width: 960px;
+    --desktop-form-width: 800px;
+    width: min(var(--desktop-page-width), 100%);
+  }
+
+  .dashboard-content:has(.invoice-manager),
+  .dashboard-content:has(.debt-page-content),
+  .dashboard-content:has(.monthly-reports-page) {
+    width: min(calc(var(--desktop-data-width) + 68px), 100%);
+  }
+
+  .dashboard-content:has(.settings-page-content) {
+    width: min(calc(var(--desktop-settings-width) + 68px), 100%);
+  }
+
+  .invoice-manager,
+  .debt-page-content,
+  .monthly-reports-page {
+    width: 100%;
+    max-width: var(--desktop-data-width);
+  }
+
+  .settings-page-content,
+  .social-security-panel,
+  .coverage-summary-panel {
+    width: 100%;
+    max-width: var(--desktop-settings-width);
+  }
+
+  .annual-plan-form,
+  .coverage-rate-form,
+  .replacement-person-form,
+  .social-security-rates {
+    width: 100%;
+    max-width: var(--desktop-form-width);
+  }
+
+  .invoice-form,
+  .debt-payment-form {
+    width: 100%;
+    max-width: var(--desktop-settings-width);
+  }
+
+  .coverage-summary-table,
+  .coverage-rate-history {
+    max-width: var(--desktop-form-width);
+  }
 }
 
 @keyframes rise-in {
