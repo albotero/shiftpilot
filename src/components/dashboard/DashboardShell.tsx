@@ -7,6 +7,7 @@ import {
   Activity,
   CalendarDays,
   CreditCard,
+  FileText,
   LayoutDashboard,
   Menu,
   Settings2,
@@ -29,12 +30,14 @@ const navigation: { href: string; label: string; mobileLabel: string; icon: Luci
   { href: "/calendar", label: "Calendario", mobileLabel: "Calendario", icon: CalendarDays },
   { href: "/finance", label: "Finanzas", mobileLabel: "Finanzas", icon: Wallet },
   { href: "/debt", label: "Deuda", mobileLabel: "Deuda", icon: CreditCard },
+  { href: "/reports", label: "Reportes", mobileLabel: "Reportes", icon: FileText },
 ]
 
 const routeLabels: Record<string, string> = {
   "/": "Resumen",
   "/calendar": "Calendario",
   "/finance": "Finanzas",
+  "/reports": "Reportes",
   "/debt": "Deuda",
   "/settings": "Configuración",
 }

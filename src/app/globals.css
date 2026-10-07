@@ -2943,6 +2943,78 @@ a {
   color: #33443b;
 }
 
+.monthly-report-content {
+  margin-top: 20px;
+}
+
+.monthly-report-period {
+  margin: 0 0 8px;
+  color: #748078;
+  text-transform: capitalize;
+}
+
+.monthly-report-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border-top: 1px solid #e4e9e3;
+}
+
+.monthly-report-section {
+  min-width: 0;
+  padding: 16px 18px 18px 0;
+  border-bottom: 1px solid #e4e9e3;
+}
+
+.monthly-report-section:nth-child(even) {
+  padding-right: 0;
+  padding-left: 18px;
+  border-left: 1px solid #e4e9e3;
+}
+
+.monthly-report-section .eyebrow {
+  margin: 0 0 4px;
+  color: #78837c;
+  font-size: 9px;
+}
+
+.monthly-report-section h2 {
+  margin: 0 0 12px;
+  color: #24332f;
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.monthly-report-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 18px;
+  margin: 0;
+}
+
+.monthly-report-metrics div {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+
+.monthly-report-metrics dt {
+  color: #78837c;
+  font-size: 10px;
+}
+
+.monthly-report-metrics dd {
+  margin: 0;
+  color: #34483b;
+  font-size: 14px;
+  font-variant-numeric: tabular-nums;
+}
+
+.monthly-report-empty {
+  margin: 0;
+  color: #78837c;
+  font-size: 11px;
+}
+
 .invoice-manager-heading,
 .invoice-items-heading,
 .invoice-form-actions {
@@ -4029,7 +4101,7 @@ a {
     inset: auto 0 0;
     display: grid;
     height: 61px;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     padding: 5px 8px max(5px, env(safe-area-inset-bottom));
     border-top: 1px solid #e3e8e1;
     background: #ffffffed;
@@ -4042,7 +4114,25 @@ a {
     justify-items: center;
     gap: 3px;
     color: #89928c;
-    font-size: 8px;
+    font-size: 7px;
+  }
+
+  .monthly-report-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .monthly-reports-page .welcome-row {
+    flex-wrap: wrap;
+  }
+
+  .monthly-report-section,
+  .monthly-report-section:nth-child(even) {
+    padding: 14px 0;
+    border-left: 0;
+  }
+
+  .monthly-report-metrics {
+    gap: 10px 14px;
   }
 
   .mobile-bottom-nav a.mobile-nav-active {
