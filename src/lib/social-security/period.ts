@@ -34,7 +34,7 @@ export function calculateSocialSecurityPeriod(
   invoices: InvoiceMonthlyAmounts[],
   configuration: SocialSecurityConfiguration = DEFAULT_SOCIAL_SECURITY_CONFIGURATION,
   minimumIbcAmount = 0,
-  minimumWageCop = 0,
+  minimumWageAmount = 0,
   ratesOverride: Partial<SocialSecurityRates> = {},
 ) {
   const grossAmount = addMoney(...invoices.map((invoice) => invoice.grossAmount))
@@ -42,7 +42,7 @@ export function calculateSocialSecurityPeriod(
   const netAmount = addMoney(...invoices.map((invoice) => invoice.netAmount))
   const ibcPercentage = roundMoneyAmount(netAmount * 0.4)
   const ibcAmount = maxMoney(ibcPercentage, minimumIbcAmount)
-  const calculatedRates = getCalculatedSocialSecurityRates(configuration, ibcAmount, minimumWageCop)
+  const calculatedRates = getCalculatedSocialSecurityRates(configuration, ibcAmount, minimumWageAmount)
   const rates = { ...calculatedRates, ...ratesOverride, solidarityRatePpm: calculatedRates.solidarityRatePpm }
   const contributions = calculateSocialSecurity(ibcAmount, rates)
 
@@ -53,12 +53,12 @@ export function calculateSocialSecurityPeriod(
     ibcAmount,
     configuration,
     rates,
-    healthAmountTenths: contributions.healthAmountTenths,
-    pensionAmountTenths: contributions.pensionAmountTenths,
-    arlAmountTenths: contributions.arlAmountTenths,
-    fundAmountTenths: contributions.fundAmountTenths,
-    solidarityAmountTenths: contributions.solidarityAmountTenths,
-    totalAmountTenths: contributions.totalAmountTenths,
+    healthAmount: contributions.healthAmount,
+    pensionAmount: contributions.pensionAmount,
+    arlAmount: contributions.arlAmount,
+    fundAmount: contributions.fundAmount,
+    solidarityAmount: contributions.solidarityAmount,
+    totalAmount: contributions.totalAmount,
   }
 }
 
@@ -95,13 +95,13 @@ export async function recalculateSocialSecurityPeriod(
           compensationFundEnabled: existingPeriod.compensationFundEnabled as boolean,
         }
       : getSocialSecurityConfiguration(settingRecords))
-  const savedMinimumWage = existingPeriod?.minimumWageCop
+  const savedMinimumWage = existingPeriod?.minimumWageAmount
   const periodMinimumWage: MinimumWageSnapshot =
-    typeof savedMinimumWage === "number" && existingPeriod
+    savedMinimumWage !== null && savedMinimumWage !== undefined && existingPeriod
       ? {
           year: monthStart.getUTCFullYear(),
           sourceYear: existingPeriod.minimumWageSourceYear ?? monthStart.getUTCFullYear(),
-          amountCop: savedMinimumWage,
+          amount: Number(savedMinimumWage),
           sourceUrl: existingPeriod.minimumWageSourceUrl ?? minimumWage.sourceUrl,
           stale: existingPeriod.minimumWageStale ?? false,
         }
@@ -122,14 +122,14 @@ export async function recalculateSocialSecurityPeriod(
       netAmount: Number(invoice.netAmount),
     })),
     configuration,
-    roundMoneyAmount(periodMinimumWage.amountCop / 1000),
-    periodMinimumWage.amountCop,
+    roundMoneyAmount(periodMinimumWage.amount),
+    periodMinimumWage.amount,
     savedRates,
   )
   const { rates, configuration: savedConfiguration, ...amounts } = calculated
   const snapshot = {
     ...amounts,
-    minimumWageCop: periodMinimumWage.amountCop,
+    minimumWageAmount: periodMinimumWage.amount,
     minimumWageSourceYear: periodMinimumWage.sourceYear,
     minimumWageSourceUrl: periodMinimumWage.sourceUrl,
     minimumWageStale: periodMinimumWage.stale,
@@ -160,12 +160,12 @@ export async function recalculateSocialSecurityPeriod(
       discounts: Number(record.discounts),
       netAmount: Number(record.netAmount),
       ibcAmount: Number(record.ibcAmount),
-      healthAmountTenths: record.healthAmountTenths,
-      pensionAmountTenths: record.pensionAmountTenths,
-      arlAmountTenths: record.arlAmountTenths,
-      fundAmountTenths: record.fundAmountTenths,
-      solidarityAmountTenths: record.solidarityAmountTenths,
-      totalAmountTenths: record.totalAmountTenths,
+      healthAmount: Number(record.healthAmount),
+      pensionAmount: Number(record.pensionAmount),
+      arlAmount: Number(record.arlAmount),
+      fundAmount: Number(record.fundAmount),
+      solidarityAmount: Number(record.solidarityAmount),
+      totalAmount: Number(record.totalAmount),
     },
   }
 }

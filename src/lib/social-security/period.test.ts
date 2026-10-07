@@ -7,7 +7,7 @@ import type { SocialSecurityPeriodDatabase } from "./period"
 const minimumWage: MinimumWageSnapshot = {
   year: 2026,
   sourceYear: 2026,
-  amountCop: 1_750_905,
+  amount: 1_750.905,
   sourceUrl: "https://www.mintrabajo.gov.co/official-2026",
   stale: false,
 }
@@ -25,7 +25,7 @@ describe("monthly social security period", () => {
       ],
       DEFAULT_SOCIAL_SECURITY_CONFIGURATION,
       0,
-      minimumWage.amountCop,
+      minimumWage.amount,
     )
 
     expect(period).toEqual({
@@ -42,18 +42,18 @@ describe("monthly social security period", () => {
         fundRatePpm: 0,
         solidarityRatePpm: 10_000,
       },
-      healthAmountTenths: 15_311,
-      pensionAmountTenths: 19_598,
-      arlAmountTenths: 2_984,
-      fundAmountTenths: 0,
-      solidarityAmountTenths: 1_225,
-      totalAmountTenths: 39_118,
+      healthAmount: 1_531.1,
+      pensionAmount: 1_959.8,
+      arlAmount: 298.4,
+      fundAmount: 0,
+      solidarityAmount: 122.5,
+      totalAmount: 3_911.8,
     })
   })
 
   it("applies the SMMLV floor to a month without invoices", () => {
     expect(
-      calculateSocialSecurityPeriod([], DEFAULT_SOCIAL_SECURITY_CONFIGURATION, 1_750.905, minimumWage.amountCop),
+      calculateSocialSecurityPeriod([], DEFAULT_SOCIAL_SECURITY_CONFIGURATION, 1_750.905, minimumWage.amount),
     ).toEqual({
       grossAmount: 0,
       discounts: 0,
@@ -61,12 +61,12 @@ describe("monthly social security period", () => {
       ibcAmount: 1_750.905,
       configuration: DEFAULT_SOCIAL_SECURITY_CONFIGURATION,
       rates: expect.objectContaining({ solidarityRatePpm: 0 }),
-      healthAmountTenths: 2_189,
-      pensionAmountTenths: 2_802,
-      arlAmountTenths: 427,
-      fundAmountTenths: 0,
-      solidarityAmountTenths: 0,
-      totalAmountTenths: 5_418,
+      healthAmount: 218.9,
+      pensionAmount: 280.2,
+      arlAmount: 42.7,
+      fundAmount: 0,
+      solidarityAmount: 0,
+      totalAmount: 541.8,
     })
   })
 
@@ -75,13 +75,12 @@ describe("monthly social security period", () => {
       [{ grossAmount: 800, discountAmount: 0, shiftDiscountAmount: 0, netAmount: 800 }],
       DEFAULT_SOCIAL_SECURITY_CONFIGURATION,
       1_750.905,
-      minimumWage.amountCop,
+      minimumWage.amount,
     )
 
     expect(period).toMatchObject({ netAmount: 800, ibcAmount: 1_750.905 })
     expect(
-      calculateSocialSecurityPeriod([], DEFAULT_SOCIAL_SECURITY_CONFIGURATION, 1_750.905, minimumWage.amountCop)
-        .ibcAmount,
+      calculateSocialSecurityPeriod([], DEFAULT_SOCIAL_SECURITY_CONFIGURATION, 1_750.905, minimumWage.amount).ibcAmount,
     ).toBe(1_750.905)
   })
 
@@ -125,7 +124,7 @@ describe("monthly social security period", () => {
       1,
       expect.objectContaining({
         create: expect.objectContaining({
-          minimumWageCop: minimumWage.amountCop,
+          minimumWageAmount: minimumWage.amount,
           minimumWageSourceYear: minimumWage.sourceYear,
           minimumWageSourceUrl: minimumWage.sourceUrl,
           pensionEnabled: true,
@@ -175,7 +174,7 @@ describe("monthly social security period", () => {
       },
       socialSecurityPeriod: {
         findUnique: vi.fn().mockResolvedValue({
-          minimumWageCop: 1_750_905,
+          minimumWageAmount: 1_750.905,
           minimumWageSourceYear: 2026,
           minimumWageSourceUrl: "https://www.mintrabajo.gov.co/official-2026",
           minimumWageStale: false,
@@ -197,7 +196,7 @@ describe("monthly social security period", () => {
     const nextYearWage: MinimumWageSnapshot = {
       year: 2027,
       sourceYear: 2027,
-      amountCop: 2_000_000,
+      amount: 2_000,
       sourceUrl: "https://www.mintrabajo.gov.co/official-2027",
       stale: false,
     }
@@ -207,7 +206,7 @@ describe("monthly social security period", () => {
     expect(result.minimumWage).toEqual({
       year: 2026,
       sourceYear: 2026,
-      amountCop: 1_750_905,
+      amount: 1_750.905,
       sourceUrl: "https://www.mintrabajo.gov.co/official-2026",
       stale: false,
     })
@@ -220,7 +219,7 @@ describe("monthly social security period", () => {
     expect(database.socialSecurityPeriod.upsert).toHaveBeenCalledWith(
       expect.objectContaining({
         update: expect.objectContaining({
-          minimumWageCop: 1_750_905,
+          minimumWageAmount: 1_750.905,
           pensionEnabled: true,
           arlRiskClass: "III",
           compensationFundEnabled: false,

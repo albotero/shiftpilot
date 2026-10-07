@@ -1,28 +1,29 @@
 import { isSameMonth } from "date-fns"
+import { addMoney } from "@/lib/money/integer"
 import type { CalendarEntry } from "./types"
 
-export const DEFAULT_COVERED_SHIFT_RATE_COP = 685_000
+export const DEFAULT_COVERED_SHIFT_RATE_THOUSANDS = 685
 export const DEFAULT_COVERED_SHIFT_RATE_HISTORY = [
-  { effectiveFrom: "1900-01-01", amount: DEFAULT_COVERED_SHIFT_RATE_COP },
+  { effectiveFrom: "1900-01-01", amountThousands: DEFAULT_COVERED_SHIFT_RATE_THOUSANDS },
 ] as const
 
-export type CoveredShiftRate = { effectiveFrom: string; amount: number }
+export type CoveredShiftRate = { effectiveFrom: string; amountThousands: number }
 
 export type CoveredShiftRow = {
   anesthesiologist: string
   jornadas: number
-  totalCop: number
+  totalAmountThousands: number
 }
 
 export type CoveredShiftSummary = {
   rows: CoveredShiftRow[]
   totalJornadas: number
-  totalCop: number
+  totalAmountThousands: number
 }
 
 export function normalizeCoveredShiftRates(value: unknown): CoveredShiftRate[] {
   if (typeof value === "number" && Number.isSafeInteger(value) && value >= 0) {
-    return [{ effectiveFrom: "1900-01-01", amount: value }]
+    return [{ effectiveFrom: "1900-01-01", amountThousands: value }]
   }
 
   if (!Array.isArray(value)) return [...DEFAULT_COVERED_SHIFT_RATE_HISTORY]
@@ -35,10 +36,10 @@ export function normalizeCoveredShiftRates(value: unknown): CoveredShiftRate[] {
         "effectiveFrom" in item &&
         typeof item.effectiveFrom === "string" &&
         /^\d{4}-\d{2}-\d{2}$/.test(item.effectiveFrom) &&
-        "amount" in item &&
-        typeof item.amount === "number" &&
-        Number.isSafeInteger(item.amount) &&
-        item.amount >= 0,
+        "amountThousands" in item &&
+        typeof item.amountThousands === "number" &&
+        Number.isFinite(item.amountThousands) &&
+        item.amountThousands >= 0,
     )
     .sort((left, right) => left.effectiveFrom.localeCompare(right.effectiveFrom))
 
@@ -47,8 +48,8 @@ export function normalizeCoveredShiftRates(value: unknown): CoveredShiftRate[] {
 
 export function getCoveredShiftRateForDate(rates: CoveredShiftRate[], date: string) {
   return rates.reduce(
-    (currentRate, rate) => (rate.effectiveFrom <= date ? rate.amount : currentRate),
-    DEFAULT_COVERED_SHIFT_RATE_COP,
+    (currentRate, rate) => (rate.effectiveFrom <= date ? rate.amountThousands : currentRate),
+    DEFAULT_COVERED_SHIFT_RATE_THOUSANDS,
   )
 }
 
@@ -57,7 +58,7 @@ export function getCoveredShiftSummary(
   month: Date,
   rates: CoveredShiftRate[],
 ): CoveredShiftSummary {
-  const totalsByAnesthesiologist = new Map<string, { jornadas: number; totalCop: number }>()
+  const totalsByAnesthesiologist = new Map<string, { jornadas: number; totalAmountThousands: number }>()
 
   for (const entry of entries) {
     if (
@@ -70,9 +71,12 @@ export function getCoveredShiftSummary(
 
     const anesthesiologist = entry.anesthesiologist?.trim() || "Sin nombre registrado"
     const jornadas = entry.period === "AM + PM" || entry.period === "NOCHE" ? 2 : 1
-    const total = totalsByAnesthesiologist.get(anesthesiologist) ?? { jornadas: 0, totalCop: 0 }
+    const total = totalsByAnesthesiologist.get(anesthesiologist) ?? { jornadas: 0, totalAmountThousands: 0 }
     total.jornadas += jornadas
-    total.totalCop += jornadas * getCoveredShiftRateForDate(rates, entry.date)
+    total.totalAmountThousands = addMoney(
+      total.totalAmountThousands,
+      jornadas * getCoveredShiftRateForDate(rates, entry.date),
+    )
     totalsByAnesthesiologist.set(anesthesiologist, total)
   }
 
@@ -83,7 +87,7 @@ export function getCoveredShiftSummary(
         right.jornadas - left.jornadas || left.anesthesiologist.localeCompare(right.anesthesiologist, "es"),
     )
   const totalJornadas = rows.reduce((total, row) => total + row.jornadas, 0)
-  const totalCop = rows.reduce((total, row) => total + row.totalCop, 0)
+  const totalAmountThousands = addMoney(...rows.map((row) => row.totalAmountThousands))
 
-  return { rows, totalJornadas, totalCop }
+  return { rows, totalJornadas, totalAmountThousands }
 }

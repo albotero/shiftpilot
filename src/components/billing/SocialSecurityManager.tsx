@@ -8,19 +8,19 @@ type Period = {
   discounts: number
   netAmount: number
   ibcAmount: number
-  healthAmountTenths: number
-  pensionAmountTenths: number
-  arlAmountTenths: number
-  fundAmountTenths: number
-  solidarityAmountTenths: number
-  totalAmountTenths: number
+  healthAmount: number
+  pensionAmount: number
+  arlAmount: number
+  fundAmount: number
+  solidarityAmount: number
+  totalAmount: number
 }
 
 type SocialSecurityResponse = {
   month: string
   configuration: SocialSecurityConfiguration
   rates: SocialSecurityRates
-  minimumWage: { year: number; sourceYear: number; amountCop: number; sourceUrl: string; stale: boolean }
+  minimumWage: { year: number; sourceYear: number; amount: number; sourceUrl: string; stale: boolean }
   period: Period
 }
 
@@ -60,18 +60,18 @@ export function SocialSecurityManager({ month, refreshToken }: { month: string; 
 
   const contributions = result
     ? [
-        { label: "Salud", rate: result.rates.healthRatePpm, amount: result.period.healthAmountTenths },
-        { label: "Pensión", rate: result.rates.pensionRatePpm, amount: result.period.pensionAmountTenths },
+        { label: "Salud", rate: result.rates.healthRatePpm, amount: result.period.healthAmount },
+        { label: "Pensión", rate: result.rates.pensionRatePpm, amount: result.period.pensionAmount },
         {
           label: `ARL · clase ${result.configuration.arlRiskClass}`,
           rate: result.rates.arlRatePpm,
-          amount: result.period.arlAmountTenths,
+          amount: result.period.arlAmount,
         },
-        { label: "Caja", rate: result.rates.fundRatePpm, amount: result.period.fundAmountTenths },
+        { label: "Caja", rate: result.rates.fundRatePpm, amount: result.period.fundAmount },
         {
           label: "Fondo de solidaridad",
           rate: result.rates.solidarityRatePpm,
-          amount: result.period.solidarityAmountTenths,
+          amount: result.period.solidarityAmount,
         },
       ]
     : []
@@ -84,7 +84,7 @@ export function SocialSecurityManager({ month, refreshToken }: { month: string; 
           <h2 id="social-security-title">Seguridad social · {month}</h2>
         </div>
         <strong className="social-security-total">
-          {result ? formatAmount(result.period.totalAmountTenths / 10) : "—"} mil COP
+          {result ? formatAmount(result.period.totalAmount) : "—"} mil COP
         </strong>
       </div>
 
@@ -123,7 +123,7 @@ export function SocialSecurityManager({ month, refreshToken }: { month: string; 
                 : `SMMLV ${result.minimumWage.year}`}
               :
             </span>
-            <strong>{formatAmount(result.minimumWage.amountCop / 1000)} mil COP</strong>
+            <strong>{formatAmount(result.minimumWage.amount)} mil COP</strong>
             {result.minimumWage.stale && <span> · valor pendiente de actualizar con MinTrabajo</span>}
             <span aria-hidden="true"> · </span>
             <a href={result.minimumWage.sourceUrl} target="_blank" rel="noreferrer">
@@ -137,7 +137,7 @@ export function SocialSecurityManager({ month, refreshToken }: { month: string; 
                 <span>
                   {label} {(Number(rate) / 10_000).toLocaleString("es-CO", { maximumFractionDigits: 3 })}%
                 </span>
-                <strong>{formatAmount(Number(amount) / 10)}</strong>
+                <strong>{formatAmount(Number(amount))}</strong>
               </div>
             ))}
           </div>

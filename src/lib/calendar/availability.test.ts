@@ -365,16 +365,16 @@ describe("calendar availability", () => {
 
     expect(
       getCoveredShiftSummary(coveredEntries, new Date("2026-10-01T12:00:00"), [
-        { effectiveFrom: "1900-01-01", amount: 685_000 },
+        { effectiveFrom: "1900-01-01", amountThousands: 685 },
       ]),
     ).toEqual({
       rows: [
-        { anesthesiologist: "Patricia", jornadas: 3, totalCop: 2_055_000 },
-        { anesthesiologist: "Sara", jornadas: 1, totalCop: 685_000 },
-        { anesthesiologist: "Sin nombre registrado", jornadas: 1, totalCop: 685_000 },
+        { anesthesiologist: "Patricia", jornadas: 3, totalAmountThousands: 2_055 },
+        { anesthesiologist: "Sara", jornadas: 1, totalAmountThousands: 685 },
+        { anesthesiologist: "Sin nombre registrado", jornadas: 1, totalAmountThousands: 685 },
       ],
       totalJornadas: 5,
-      totalCop: 3_425_000,
+      totalAmountThousands: 3_425,
     })
   })
 
@@ -405,14 +405,14 @@ describe("calendar availability", () => {
       },
     ]
     const rates = [
-      { effectiveFrom: "1900-01-01", amount: 685_000 },
-      { effectiveFrom: "2026-10-08", amount: 700_000 },
+      { effectiveFrom: "1900-01-01", amountThousands: 685 },
+      { effectiveFrom: "2026-10-08", amountThousands: 700 },
     ]
 
     expect(getCoveredShiftSummary(coveredEntries, new Date("2026-10-01T12:00:00"), rates)).toEqual({
-      rows: [{ anesthesiologist: "Patricia", jornadas: 4, totalCop: 2_770_000 }],
+      rows: [{ anesthesiologist: "Patricia", jornadas: 4, totalAmountThousands: 2_770 }],
       totalJornadas: 4,
-      totalCop: 2_770_000,
+      totalAmountThousands: 2_770,
     })
   })
 

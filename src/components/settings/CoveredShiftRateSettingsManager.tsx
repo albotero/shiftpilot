@@ -5,21 +5,21 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import { CircleDollarSign, Pencil, Save, Trash2, X } from "lucide-react"
 import {
-  DEFAULT_COVERED_SHIFT_RATE_COP,
+  DEFAULT_COVERED_SHIFT_RATE_THOUSANDS,
   DEFAULT_COVERED_SHIFT_RATE_HISTORY,
   type CoveredShiftRate,
 } from "@/lib/calendar/coverage-compensation"
 
 type CoverageRateResponse = {
-  amount: number
-  configuredAmount: number
+  amountThousands: number
+  configuredAmountThousands: number
   effectiveFrom: string
   minimumEffectiveFrom: string
   rates: CoveredShiftRate[]
 }
 
-function formatThousandsCop(amountCop: number) {
-  return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 3 }).format(amountCop / 1000)
+function formatThousandsCop(amountThousands: number) {
+  return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 3 }).format(amountThousands)
 }
 
 function formatEffectiveDate(date: string) {
@@ -30,7 +30,7 @@ export function CoveredShiftRateSettingsManager() {
   const [rates, setRates] = useState<CoveredShiftRate[]>(() => [...DEFAULT_COVERED_SHIFT_RATE_HISTORY])
   const [minimumEffectiveFrom, setMinimumEffectiveFrom] = useState("")
   const [effectiveFrom, setEffectiveFrom] = useState("")
-  const [amount, setAmount] = useState(String(DEFAULT_COVERED_SHIFT_RATE_COP / 1000))
+  const [amount, setAmount] = useState(String(DEFAULT_COVERED_SHIFT_RATE_THOUSANDS))
   const [editingEffectiveFrom, setEditingEffectiveFrom] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [ready, setReady] = useState(false)
@@ -48,7 +48,7 @@ export function CoveredShiftRateSettingsManager() {
         setRates(result.rates)
         setMinimumEffectiveFrom(result.minimumEffectiveFrom)
         setEffectiveFrom(result.minimumEffectiveFrom)
-        setAmount(String(result.configuredAmount / 1000))
+        setAmount(String(result.configuredAmountThousands))
         setReady(true)
       })
       .catch((loadError) => {
@@ -65,7 +65,7 @@ export function CoveredShiftRateSettingsManager() {
   function editRate(rate: CoveredShiftRate) {
     setEditingEffectiveFrom(rate.effectiveFrom)
     setEffectiveFrom(rate.effectiveFrom)
-    setAmount(String(rate.amount / 1000))
+    setAmount(String(rate.amountThousands))
     setError("")
     setMessage("")
   }
@@ -73,7 +73,7 @@ export function CoveredShiftRateSettingsManager() {
   function cancelEdit() {
     setEditingEffectiveFrom(null)
     setEffectiveFrom(minimumEffectiveFrom)
-    setAmount(String((rates.at(-1)?.amount ?? DEFAULT_COVERED_SHIFT_RATE_COP) / 1000))
+    setAmount(String(rates.at(-1)?.amountThousands ?? DEFAULT_COVERED_SHIFT_RATE_THOUSANDS))
     setError("")
     setMessage("")
   }
@@ -104,7 +104,7 @@ export function CoveredShiftRateSettingsManager() {
       setMinimumEffectiveFrom(result.minimumEffectiveFrom)
       setEditingEffectiveFrom(null)
       setEffectiveFrom(result.minimumEffectiveFrom)
-      setAmount(String(result.configuredAmount / 1000))
+      setAmount(String(result.configuredAmountThousands))
       setMessage("Tarifa eliminada; las jornadas de ese período usan la tarifa anterior.")
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "No se pudo borrar la tarifa.")
@@ -117,9 +117,7 @@ export function CoveredShiftRateSettingsManager() {
     event.preventDefault()
     const previousRate = editingEffectiveFrom ? rates.find((rate) => rate.effectiveFrom === editingEffectiveFrom) : null
     const changed =
-      !previousRate ||
-      previousRate.amount !== Math.round(Number(amount) * 1000) ||
-      previousRate.effectiveFrom !== effectiveFrom
+      !previousRate || previousRate.amountThousands !== Number(amount) || previousRate.effectiveFrom !== effectiveFrom
     const changesPastPeriod =
       (editingEffectiveFrom !== null && editingEffectiveFrom < minimumEffectiveFrom) ||
       effectiveFrom < minimumEffectiveFrom
@@ -143,7 +141,7 @@ export function CoveredShiftRateSettingsManager() {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          amount: Math.round(Number(amount) * 1000),
+          amountThousands: Number(amount),
           effectiveFrom,
           ...(editingEffectiveFrom ? { previousEffectiveFrom: editingEffectiveFrom } : {}),
         }),
@@ -153,7 +151,7 @@ export function CoveredShiftRateSettingsManager() {
       setRates(result.rates)
       setMinimumEffectiveFrom(result.minimumEffectiveFrom)
       setEffectiveFrom(result.minimumEffectiveFrom)
-      setAmount(String(result.configuredAmount / 1000))
+      setAmount(String(result.configuredAmountThousands))
       setEditingEffectiveFrom(null)
       setMessage("Historial actualizado; cada jornada conserva la tarifa vigente en su fecha.")
     } catch (saveError) {
@@ -248,7 +246,7 @@ export function CoveredShiftRateSettingsManager() {
                   return (
                     <tr key={rate.effectiveFrom}>
                       <th scope="row">{formatEffectiveDate(rate.effectiveFrom)}</th>
-                      <td>{formatThousandsCop(rate.amount)}</td>
+                      <td>{formatThousandsCop(rate.amountThousands)}</td>
                       <td>
                         <div className="coverage-rate-row-actions">
                           <button

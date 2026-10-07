@@ -278,7 +278,7 @@ model SocialSecurityPeriod {
   discounts      Decimal  @default(0) @db.Decimal(18, 3)
   netAmount      Decimal  @default(0) @db.Decimal(18, 3)
   ibcAmount      Decimal  @default(0) @db.Decimal(18, 3)
-  minimumWageCop           Int?
+  minimumWageAmount        Decimal? @db.Decimal(18, 3)
   minimumWageSourceYear    Int?
   minimumWageSourceUrl     String?
   minimumWageStale         Boolean?
@@ -292,12 +292,12 @@ model SocialSecurityPeriod {
   arlRatePpm               Int?
   fundRatePpm              Int?
   solidarityRatePpm        Int?
-  healthAmountTenths  Int @default(0)
-  pensionAmountTenths Int @default(0)
-  arlAmountTenths     Int @default(0)
-  fundAmountTenths    Int @default(0)
-  solidarityAmountTenths Int @default(0)
-  totalAmountTenths   Int @default(0)
+  healthAmount        Decimal @default(0) @db.Decimal(18, 3)
+  pensionAmount       Decimal @default(0) @db.Decimal(18, 3)
+  arlAmount           Decimal @default(0) @db.Decimal(18, 3)
+  fundAmount          Decimal @default(0) @db.Decimal(18, 3)
+  solidarityAmount    Decimal @default(0) @db.Decimal(18, 3)
+  totalAmount         Decimal @default(0) @db.Decimal(18, 3)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 }
@@ -306,7 +306,7 @@ model Debt {
   id                    String        @id @default(cuid())
   name                  String        @unique @default("Compra de acciones")
   shareCount            Int
-  sharePriceCop         Int
+  sharePriceAmount      Decimal       @db.Decimal(18, 3)
   originalAmount        Decimal       @db.Decimal(18, 3)
   contractualRatePpm    Int           @default(80000)
   lateFeeRatePpm        Int           @default(0)

@@ -5,19 +5,19 @@ import { format } from "date-fns"
 import { es } from "date-fns/locale"
 import type { CalendarEntry } from "@/lib/calendar/types"
 import {
-  DEFAULT_COVERED_SHIFT_RATE_COP,
+  DEFAULT_COVERED_SHIFT_RATE_THOUSANDS,
   DEFAULT_COVERED_SHIFT_RATE_HISTORY,
   getCoveredShiftSummary,
   normalizeCoveredShiftRates,
   type CoveredShiftRate,
 } from "@/lib/calendar/coverage-compensation"
 
-function formatThousandsCop(amountCop: number) {
-  return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 3 }).format(amountCop / 1000)
+function formatThousandsCop(amountThousands: number) {
+  return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 3 }).format(amountThousands)
 }
 
 export function CoveredShiftSummary({ entries, month }: { entries: CalendarEntry[]; month: Date }) {
-  const [rate, setRate] = useState(DEFAULT_COVERED_SHIFT_RATE_COP)
+  const [rate, setRate] = useState(DEFAULT_COVERED_SHIFT_RATE_THOUSANDS)
   const [rates, setRates] = useState<CoveredShiftRate[]>(() => [...DEFAULT_COVERED_SHIFT_RATE_HISTORY])
   const summary = getCoveredShiftSummary(entries, month, rates)
 
@@ -27,8 +27,8 @@ export function CoveredShiftSummary({ entries, month }: { entries: CalendarEntry
       .then(async (response) => {
         const result = await response.json()
         if (!response.ok) throw new Error(result.error ?? "No se pudo consultar la tarifa por jornada.")
-        if (!controller.signal.aborted && Number.isSafeInteger(result.amount) && result.amount >= 0) {
-          setRate(result.amount)
+        if (!controller.signal.aborted && Number.isFinite(result.amountThousands) && result.amountThousands >= 0) {
+          setRate(result.amountThousands)
           setRates(normalizeCoveredShiftRates(result.rates))
         }
       })
@@ -60,7 +60,7 @@ export function CoveredShiftSummary({ entries, month }: { entries: CalendarEntry
               <tr key={row.anesthesiologist}>
                 <th scope="row">{row.anesthesiologist}</th>
                 <td>{row.jornadas}</td>
-                <td>{formatThousandsCop(row.totalCop)}</td>
+                <td>{formatThousandsCop(row.totalAmountThousands)}</td>
               </tr>
             ))}
           </tbody>
@@ -68,7 +68,7 @@ export function CoveredShiftSummary({ entries, month }: { entries: CalendarEntry
             <tr>
               <th scope="row">Total</th>
               <td>{summary.totalJornadas}</td>
-              <td>{formatThousandsCop(summary.totalCop)}</td>
+              <td>{formatThousandsCop(summary.totalAmountThousands)}</td>
             </tr>
           </tfoot>
         </table>

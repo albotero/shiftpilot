@@ -46,7 +46,7 @@ async function main() {
     create: {
       name: "Compra de acciones",
       shareCount: 20_316,
-      sharePriceCop: 35_500,
+      sharePriceAmount: 35.5,
       originalAmount: 721_218,
       contractualRatePpm: 80_000,
       lateFeeRatePpm: 0,

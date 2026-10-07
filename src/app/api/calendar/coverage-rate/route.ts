@@ -1,17 +1,18 @@
 import { z } from "zod"
 import {
-  DEFAULT_COVERED_SHIFT_RATE_COP,
+  DEFAULT_COVERED_SHIFT_RATE_THOUSANDS,
   getCoveredShiftRateForDate,
   normalizeCoveredShiftRates,
 } from "@/lib/calendar/coverage-compensation"
+import { assertMoneyAmount } from "@/lib/money/integer"
 import { prisma } from "@/server/db"
 
 export const dynamic = "force-dynamic"
 
-const COVERAGE_RATE_KEY = "calendar.coveredShiftRateCop"
+const COVERAGE_RATE_KEY = "calendar.coveredShiftRateThousands"
 const dateKeySchema = z.string().regex(/^\d{4}-\d{2}-\d{2}$/)
 const rateSchema = z.object({
-  amount: z.number().int().min(0).max(1_000_000_000),
+  amountThousands: z.number().finite().nonnegative().max(1_000_000),
   effectiveFrom: dateKeySchema.optional(),
   previousEffectiveFrom: dateKeySchema.optional(),
 })
@@ -43,10 +44,10 @@ function isValidDateKey(value: string) {
 }
 
 function rateResponse(rates: ReturnType<typeof normalizeCoveredShiftRates>, today: string) {
-  const latest = rates.at(-1) ?? { effectiveFrom: "1900-01-01", amount: DEFAULT_COVERED_SHIFT_RATE_COP }
+  const latest = rates.at(-1) ?? { effectiveFrom: "1900-01-01", amountThousands: DEFAULT_COVERED_SHIFT_RATE_THOUSANDS }
   return {
-    amount: getCoveredShiftRateForDate(rates, today),
-    configuredAmount: latest.amount,
+    amountThousands: getCoveredShiftRateForDate(rates, today),
+    configuredAmountThousands: latest.amountThousands,
     effectiveFrom: latest.effectiveFrom,
     minimumEffectiveFrom: nextCalendarDate(today),
     rates,
@@ -75,7 +76,13 @@ export async function PUT(request: Request) {
   }
 
   const parsed = rateSchema.safeParse(body)
-  if (!parsed.success) return Response.json({ error: "La tarifa debe ser un valor entero en COP" }, { status: 400 })
+  if (!parsed.success)
+    return Response.json({ error: "La tarifa debe estar expresada en miles de COP" }, { status: 400 })
+  try {
+    assertMoneyAmount(parsed.data.amountThousands, "covered shift rate")
+  } catch {
+    return Response.json({ error: "La tarifa admite máximo tres decimales en miles de COP" }, { status: 400 })
+  }
 
   try {
     const today = todayInColombia()
@@ -102,7 +109,7 @@ export async function PUT(request: Request) {
     if (nextRates.some((rate) => rate.effectiveFrom === effectiveFrom)) {
       return Response.json({ error: "Ya existe una tarifa con esa fecha de inicio" }, { status: 409 })
     }
-    nextRates = [...nextRates, { effectiveFrom, amount: parsed.data.amount }].sort((left, right) =>
+    nextRates = [...nextRates, { effectiveFrom, amountThousands: parsed.data.amountThousands }].sort((left, right) =>
       left.effectiveFrom.localeCompare(right.effectiveFrom),
     )
     await prisma.appSetting.upsert({

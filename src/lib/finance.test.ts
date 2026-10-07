@@ -62,12 +62,12 @@ describe("social security calculations", () => {
 
   it("rounds each contribution upward to one decimal in thousands of COP", () => {
     expect(calculateSocialSecurity(1000)).toMatchObject({
-      healthAmountTenths: 1250,
-      pensionAmountTenths: 1600,
-      arlAmountTenths: 244,
-      fundAmountTenths: 0,
-      solidarityAmountTenths: 0,
-      totalAmountTenths: 3094,
+      healthAmount: 125,
+      pensionAmount: 160,
+      arlAmount: 24.4,
+      fundAmount: 0,
+      solidarityAmount: 0,
+      totalAmount: 309.4,
     })
   })
 
@@ -100,24 +100,24 @@ describe("social security calculations", () => {
       [8.001, 11],
     ] as const) {
       const result = calculateSocialSecurity(ibc, sameRateForEachComponent)
-      expect(result.healthAmountTenths).toBe(expectedTenths)
-      expect(result.pensionAmountTenths).toBe(expectedTenths)
-      expect(result.arlAmountTenths).toBe(expectedTenths)
-      expect(result.fundAmountTenths).toBe(expectedTenths)
-      expect(result.solidarityAmountTenths).toBe(expectedTenths)
-      expect(result.totalAmountTenths).toBe(expectedTenths * 5)
+      expect(result.healthAmount).toBe(expectedTenths / 10)
+      expect(result.pensionAmount).toBe(expectedTenths / 10)
+      expect(result.arlAmount).toBe(expectedTenths / 10)
+      expect(result.fundAmount).toBe(expectedTenths / 10)
+      expect(result.solidarityAmount).toBe(expectedTenths / 10)
+      expect(result.totalAmount).toBe(expectedTenths / 2)
     }
   })
 
   it("calculates solidarity progressively from four minimum wages only when pension is paid", () => {
-    const minimumWage = 1_750_905
+    const minimumWage = 1_750.905
     const thresholds = [4, 16, 17, 18, 19, 20].map((multiple) =>
-      getSolidarityRatePpm((minimumWage * multiple) / 1000, minimumWage, true),
+      getSolidarityRatePpm(minimumWage * multiple, minimumWage, true),
     )
 
     expect(thresholds).toEqual([10_000, 12_000, 14_000, 16_000, 18_000, 20_000])
-    expect(getSolidarityRatePpm((minimumWage * 4 - 1) / 1000, minimumWage, true)).toBe(0)
-    expect(getSolidarityRatePpm((minimumWage * 20) / 1000, minimumWage, false)).toBe(0)
+    expect(getSolidarityRatePpm(minimumWage * 4 - 0.001, minimumWage, true)).toBe(0)
+    expect(getSolidarityRatePpm(minimumWage * 20, minimumWage, false)).toBe(0)
   })
 
   it("derives pension, ARL class, and voluntary compensation fund rates from options", () => {
@@ -125,7 +125,7 @@ describe("social security calculations", () => {
       getCalculatedSocialSecurityRates(
         { pensionEnabled: false, arlEnabled: true, arlRiskClass: "V", compensationFundEnabled: true },
         100_000,
-        1_750_905,
+        1_750.905,
       ),
     ).toEqual({
       ...DEFAULT_SOCIAL_SECURITY_RATES,

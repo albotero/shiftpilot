@@ -23,10 +23,10 @@ const settings = [
   { key: "billing.particular.discountPpm", value: 120_000 },
   { key: "billing.particular.shiftAmount", value: 685 },
   {
-    key: "socialSecurity.minimumWageCop.2026",
+    key: "socialSecurity.minimumWageAmount.2026",
     value: {
       year: 2026,
-      amountCop: 1_750_905,
+      amount: 1_750.905,
       sourceUrl: "https://www.mintrabajo.gov.co/test-2026",
       updatedAt: "2026-01-01T00:00:00.000Z",
     },

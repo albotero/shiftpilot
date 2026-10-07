@@ -1,12 +1,13 @@
 import type { Prisma } from "@prisma/client"
 
 const officialOrigin = "https://www.mintrabajo.gov.co"
-const settingPrefix = "socialSecurity.minimumWageCop."
+const settingPrefix = "socialSecurity.minimumWageAmount."
+const legacySettingPrefix = "socialSecurity.minimumWageCop."
 const checkedPrefix = "socialSecurity.minimumWageChecked."
 const refreshIntervalMilliseconds = 24 * 60 * 60 * 1000
-const knownMinimumWageCop: Record<number, { amountCop: number; sourceUrl: string }> = {
+const knownMinimumWage: Record<number, { amount: number; sourceUrl: string }> = {
   2026: {
-    amountCop: 1_750_905,
+    amount: 1_750.905,
     sourceUrl:
       "https://www.mintrabajo.gov.co/web/guest/mintrabajo-habilita-codigo-qr-para-denuncias-por-incumplimiento-del-nuevo-incremento-del-salario-minimo-vital",
   },
@@ -15,14 +16,14 @@ const knownMinimumWageCop: Record<number, { amountCop: number; sourceUrl: string
 export type MinimumWageSnapshot = {
   year: number
   sourceYear: number
-  amountCop: number
+  amount: number
   sourceUrl: string
   stale: boolean
 }
 
 type MinimumWageDatabase = Pick<Prisma.TransactionClient, "appSetting">
 type Fetcher = (input: string | URL, init?: RequestInit) => Promise<Response>
-type StoredMinimumWage = { year: number; amountCop: number; sourceUrl: string; updatedAt: string }
+type StoredMinimumWage = { year: number; amount: number; sourceUrl: string; updatedAt: string }
 type StoredMinimumWageCheck = { checkedAt: string }
 
 function decodeHtml(value: string) {
@@ -64,30 +65,35 @@ export function parseMinimumWageFromOfficialArticle(html: string, year: number) 
   ]
   for (const pattern of matches) {
     const match = pattern.exec(text)
-    const amount = match?.[1] ? parseCopAmount(match[1]) : null
-    if (amount !== null) return amount
+    const amountCop = match?.[1] ? parseCopAmount(match[1]) : null
+    if (amountCop !== null) return amountCop / 1000
   }
   return null
 }
 
 function getStoredWage(value: unknown, year: number): MinimumWageSnapshot | null {
-  if (typeof value !== "object" || value === null || !("amountCop" in value) || !("sourceUrl" in value)) return null
-  const saved = value as Partial<StoredMinimumWage>
-  if (saved.year !== year || !Number.isSafeInteger(saved.amountCop) || !saved.sourceUrl?.startsWith(officialOrigin))
-    return null
-  return { year, sourceYear: year, amountCop: saved.amountCop as number, sourceUrl: saved.sourceUrl, stale: false }
+  if (typeof value !== "object" || value === null || !("sourceUrl" in value)) return null
+  const saved = value as Partial<StoredMinimumWage> & { amountCop?: number }
+  const amount =
+    typeof saved.amount === "number" && Number.isFinite(saved.amount)
+      ? saved.amount
+      : typeof saved.amountCop === "number" && Number.isSafeInteger(saved.amountCop)
+        ? saved.amountCop / 1000
+        : null
+  if (saved.year !== year || amount === null || amount < 0 || !saved.sourceUrl?.startsWith(officialOrigin)) return null
+  return { year, sourceYear: year, amount, sourceUrl: saved.sourceUrl, stale: false }
 }
 
 function getFallbackWage(records: { key: string; value: unknown }[], year: number) {
   const previous = records
     .map((record) => {
-      const match = new RegExp(`^${settingPrefix}(\\d{4})$`).exec(record.key)
+      const match = /^socialSecurity\.minimumWage(?:Amount|Cop)\.(\d{4})$/.exec(record.key)
       const recordYear = match ? Number(match[1]) : 0
       return { wage: getStoredWage(record.value, recordYear), recordYear }
     })
     .filter((record) => record.recordYear < year && record.wage)
     .sort((left, right) => right.recordYear - left.recordYear)[0]?.wage
-  const known = knownMinimumWageCop[year]
+  const known = knownMinimumWage[year]
   return previous ?? (known ? { year, sourceYear: year, ...known, stale: false } : null)
 }
 
@@ -124,8 +130,8 @@ export async function fetchOfficialMinimumWage(
     const articleResponse = await fetcher(candidate.url, { signal: AbortSignal.timeout(8_000) })
     if (!articleResponse.ok) continue
     const html = await articleResponse.text()
-    const amountCop = parseMinimumWageFromOfficialArticle(html, year)
-    if (amountCop !== null) return { year, sourceYear: year, amountCop, sourceUrl: candidate.url.href }
+    const amount = parseMinimumWageFromOfficialArticle(html, year)
+    if (amount !== null) return { year, sourceYear: year, amount, sourceUrl: candidate.url.href }
   }
   throw new Error(`No se encontró el salario mínimo oficial de ${year} en el archivo de MinTrabajo`)
 }
@@ -138,7 +144,9 @@ export async function getMinimumWageForYear(
   if (!Number.isInteger(year) || year < 1900 || year > 9998) throw new RangeError("Año inválido")
   const records = await database.appSetting.findMany({ where: { key: { startsWith: "socialSecurity.minimumWage" } } })
   const exactKey = `${settingPrefix}${year}`
-  const current = records.find((record) => record.key === exactKey)
+  const current =
+    records.find((record) => record.key === exactKey) ??
+    records.find((record) => record.key === `${legacySettingPrefix}${year}`)
   const cached = current ? getStoredWage(current.value, year) : null
   if (cached) return cached
 

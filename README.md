@@ -10,7 +10,7 @@ El proyecto no tiene autenticación y está pensado para una sola persona en un 
 
 El seed actual incluye datos personales de ejemplo/origen: un plan de deuda de acciones de 72 cuotas y un pago real. Antes de ejecutar `npm run db:seed` en un fork que vayas a compartir, revisa `prisma/debt-schedule.ts` y `prisma/seed.ts`; reemplaza o elimina esos registros si no son tuyos. No subas `.env`, copias de seguridad ni datos financieros reales a un repositorio público.
 
-Los importes de negocio se expresan en miles de COP. Por ejemplo, `685` representa `$685.000 COP`. Las tasas se almacenan como partes por millón para calcular porcentajes con enteros. Las contribuciones de seguridad social conservan una décima de mil COP en enteros, equivalente a unidades de `$100 COP`.
+Los importes de negocio se guardan, calculan y muestran en miles de COP. Por ejemplo, `685` representa `$685.000 COP`; se admiten hasta tres decimales, donde `0,001` equivale a `$1 COP`. Las fuentes oficiales y documentos que informan pesos completos se convierten a miles al ingresar al sistema. Las tasas se almacenan como partes por millón y no son importes monetarios.
 
 ## Crear tu fork
 

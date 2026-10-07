@@ -23,17 +23,21 @@ async function getMinimumWageForMonth(month: string) {
   const savedPeriod = await prisma.socialSecurityPeriod.findUnique({
     where: { month: new Date(`${month}-01T00:00:00.000Z`) },
     select: {
-      minimumWageCop: true,
+      minimumWageAmount: true,
       minimumWageSourceYear: true,
       minimumWageSourceUrl: true,
       minimumWageStale: true,
     },
   })
-  if (typeof savedPeriod?.minimumWageCop === "number" && typeof savedPeriod.minimumWageSourceUrl === "string") {
+  if (
+    savedPeriod?.minimumWageAmount !== null &&
+    savedPeriod?.minimumWageAmount !== undefined &&
+    typeof savedPeriod.minimumWageSourceUrl === "string"
+  ) {
     return {
       year,
       sourceYear: savedPeriod.minimumWageSourceYear ?? year,
-      amountCop: savedPeriod.minimumWageCop,
+      amount: Number(savedPeriod.minimumWageAmount),
       sourceUrl: savedPeriod.minimumWageSourceUrl,
       stale: savedPeriod.minimumWageStale ?? false,
     }

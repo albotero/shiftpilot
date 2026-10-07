@@ -8,7 +8,7 @@ const mintrabajoArticle = `
 
 describe("annual Colombian minimum wage", () => {
   it("extracts the basic monthly wage without including the transport allowance", () => {
-    expect(parseMinimumWageFromOfficialArticle(mintrabajoArticle, 2026)).toBe(1_750_905)
+    expect(parseMinimumWageFromOfficialArticle(mintrabajoArticle, 2026)).toBe(1_750.905)
     expect(parseMinimumWageFromOfficialArticle(mintrabajoArticle, 2027)).toBeNull()
   })
 
@@ -27,7 +27,7 @@ describe("annual Colombian minimum wage", () => {
     await expect(fetchOfficialMinimumWage(2026, fetcher)).resolves.toEqual({
       year: 2026,
       sourceYear: 2026,
-      amountCop: 1_750_905,
+      amount: 1_750.905,
       sourceUrl:
         "https://www.mintrabajo.gov.co/web/guest/mintrabajo-habilita-codigo-qr-para-denuncias-por-incumplimiento-del-nuevo-incremento-del-salario-minimo-vital",
     })
@@ -41,10 +41,10 @@ describe("annual Colombian minimum wage", () => {
         .mockResolvedValueOnce([])
         .mockResolvedValueOnce([
           {
-            key: "socialSecurity.minimumWageCop.2026",
+            key: "socialSecurity.minimumWageAmount.2026",
             value: {
               year: 2026,
-              amountCop: 1_750_905,
+              amount: 1_750.905,
               sourceUrl: "https://www.mintrabajo.gov.co/official-2026",
               updatedAt: "2026-01-01T00:00:00.000Z",
             },
@@ -67,7 +67,7 @@ describe("annual Colombian minimum wage", () => {
     const callsAfterRefresh = fetcher.mock.calls.length
     const second = await getMinimumWageForYear(database, 2026, fetcher)
 
-    expect(first.amountCop).toBe(1_750_905)
+    expect(first.amount).toBe(1_750.905)
     expect(second.stale).toBe(false)
     expect(appSetting.upsert).toHaveBeenCalledTimes(1)
     expect(callsAfterRefresh).toBe(2)
@@ -78,10 +78,10 @@ describe("annual Colombian minimum wage", () => {
     const appSetting = {
       findMany: vi.fn().mockResolvedValue([
         {
-          key: "socialSecurity.minimumWageCop.2026",
+          key: "socialSecurity.minimumWageAmount.2026",
           value: {
             year: 2026,
-            amountCop: 1_750_905,
+            amount: 1_750.905,
             sourceUrl: "https://www.mintrabajo.gov.co/official-2026",
             updatedAt: "2026-01-01T00:00:00.000Z",
           },
@@ -96,7 +96,7 @@ describe("annual Colombian minimum wage", () => {
       vi.fn(async () => new Response("unavailable", { status: 503 })),
     )
 
-    expect(wage).toMatchObject({ year: 2027, sourceYear: 2026, amountCop: 1_750_905, stale: true })
+    expect(wage).toMatchObject({ year: 2027, sourceYear: 2026, amount: 1_750.905, stale: true })
     expect(appSetting.upsert).toHaveBeenCalledWith({
       where: { key: "socialSecurity.minimumWageChecked.2027" },
       create: {
@@ -111,10 +111,10 @@ describe("annual Colombian minimum wage", () => {
     const appSetting = {
       findMany: vi.fn().mockResolvedValue([
         {
-          key: "socialSecurity.minimumWageCop.2026",
+          key: "socialSecurity.minimumWageAmount.2026",
           value: {
             year: 2026,
-            amountCop: 1_750_905,
+            amount: 1_750.905,
             sourceUrl: "https://www.mintrabajo.gov.co/official-2026",
             updatedAt: "2026-01-01T00:00:00.000Z",
           },
@@ -130,7 +130,7 @@ describe("annual Colombian minimum wage", () => {
 
     const wage = await getMinimumWageForYear({ appSetting } as never, 2027, fetcher)
 
-    expect(wage).toMatchObject({ year: 2027, sourceYear: 2026, amountCop: 1_750_905, stale: true })
+    expect(wage).toMatchObject({ year: 2027, sourceYear: 2026, amount: 1_750.905, stale: true })
     expect(fetcher).not.toHaveBeenCalled()
     expect(appSetting.upsert).not.toHaveBeenCalled()
   })

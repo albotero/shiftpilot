@@ -1,4 +1,4 @@
-import { percentageOf, roundUpPercentageToScale } from "@/lib/money/integer"
+import { addMoney, percentageOf, roundUpPercentageToScale } from "@/lib/money/integer"
 
 export const DEFAULT_SOCIAL_SECURITY_RATES = {
   ibcRatePpm: 400_000,
@@ -44,12 +44,12 @@ export type SocialSecurityRates = {
 
 export type SocialSecurityBreakdown = {
   ibcAmount: number
-  healthAmountTenths: number
-  pensionAmountTenths: number
-  arlAmountTenths: number
-  fundAmountTenths: number
-  solidarityAmountTenths: number
-  totalAmountTenths: number
+  healthAmount: number
+  pensionAmount: number
+  arlAmount: number
+  fundAmount: number
+  solidarityAmount: number
+  totalAmount: number
 }
 
 export function getSocialSecurityConfiguration(
@@ -93,22 +93,21 @@ export function getSocialSecurityConfiguration(
   }
 }
 
-export function getSolidarityRatePpm(ibcAmount: number, minimumWageCop: number, pensionEnabled: boolean) {
-  if (!pensionEnabled || minimumWageCop <= 0) return 0
-  const ibcCop = Math.round(ibcAmount * 1000)
-  if (ibcCop < minimumWageCop * 4) return 0
-  if (ibcCop < minimumWageCop * 16) return 10_000
-  if (ibcCop < minimumWageCop * 17) return 12_000
-  if (ibcCop < minimumWageCop * 18) return 14_000
-  if (ibcCop < minimumWageCop * 19) return 16_000
-  if (ibcCop < minimumWageCop * 20) return 18_000
+export function getSolidarityRatePpm(ibcAmount: number, minimumWageAmount: number, pensionEnabled: boolean) {
+  if (!pensionEnabled || minimumWageAmount <= 0) return 0
+  if (ibcAmount < minimumWageAmount * 4) return 0
+  if (ibcAmount < minimumWageAmount * 16) return 10_000
+  if (ibcAmount < minimumWageAmount * 17) return 12_000
+  if (ibcAmount < minimumWageAmount * 18) return 14_000
+  if (ibcAmount < minimumWageAmount * 19) return 16_000
+  if (ibcAmount < minimumWageAmount * 20) return 18_000
   return 20_000
 }
 
 export function getCalculatedSocialSecurityRates(
   configuration: SocialSecurityConfiguration,
   ibcAmount: number,
-  minimumWageCop: number,
+  minimumWageAmount: number,
 ): SocialSecurityRates {
   return {
     ibcRatePpm: 400_000,
@@ -116,7 +115,7 @@ export function getCalculatedSocialSecurityRates(
     pensionRatePpm: configuration.pensionEnabled ? 160_000 : 0,
     arlRatePpm: configuration.arlEnabled ? arlRatePpmByClass[configuration.arlRiskClass] : 0,
     fundRatePpm: configuration.compensationFundEnabled ? 20_000 : 0,
-    solidarityRatePpm: getSolidarityRatePpm(ibcAmount, minimumWageCop, configuration.pensionEnabled),
+    solidarityRatePpm: getSolidarityRatePpm(ibcAmount, minimumWageAmount, configuration.pensionEnabled),
   }
 }
 
@@ -128,20 +127,19 @@ export function calculateSocialSecurity(
   ibcAmount: number,
   rates: SocialSecurityRates = DEFAULT_SOCIAL_SECURITY_RATES,
 ): SocialSecurityBreakdown {
-  const healthAmountTenths = roundUpPercentageToScale(ibcAmount, rates.healthRatePpm, 10)
-  const pensionAmountTenths = roundUpPercentageToScale(ibcAmount, rates.pensionRatePpm, 10)
-  const arlAmountTenths = roundUpPercentageToScale(ibcAmount, rates.arlRatePpm, 10)
-  const fundAmountTenths = roundUpPercentageToScale(ibcAmount, rates.fundRatePpm, 10)
-  const solidarityAmountTenths = roundUpPercentageToScale(ibcAmount, rates.solidarityRatePpm, 10)
+  const healthAmount = roundUpPercentageToScale(ibcAmount, rates.healthRatePpm, 10) / 10
+  const pensionAmount = roundUpPercentageToScale(ibcAmount, rates.pensionRatePpm, 10) / 10
+  const arlAmount = roundUpPercentageToScale(ibcAmount, rates.arlRatePpm, 10) / 10
+  const fundAmount = roundUpPercentageToScale(ibcAmount, rates.fundRatePpm, 10) / 10
+  const solidarityAmount = roundUpPercentageToScale(ibcAmount, rates.solidarityRatePpm, 10) / 10
 
   return {
     ibcAmount,
-    healthAmountTenths,
-    pensionAmountTenths,
-    arlAmountTenths,
-    fundAmountTenths,
-    solidarityAmountTenths,
-    totalAmountTenths:
-      healthAmountTenths + pensionAmountTenths + arlAmountTenths + fundAmountTenths + solidarityAmountTenths,
+    healthAmount,
+    pensionAmount,
+    arlAmount,
+    fundAmount,
+    solidarityAmount,
+    totalAmount: addMoney(healthAmount, pensionAmount, arlAmount, fundAmount, solidarityAmount),
   }
 }

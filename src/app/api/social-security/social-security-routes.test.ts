@@ -19,10 +19,10 @@ const settings = [
     value: { pensionEnabled: true, arlEnabled: true, arlRiskClass: "III", compensationFundEnabled: false },
   },
   {
-    key: "socialSecurity.minimumWageCop.2026",
+    key: "socialSecurity.minimumWageAmount.2026",
     value: {
       year: 2026,
-      amountCop: 1_750_905,
+      amount: 1_750.905,
       sourceUrl: "https://www.mintrabajo.gov.co/test-2026",
       updatedAt: "2026-01-01T00:00:00.000Z",
     },
@@ -78,7 +78,7 @@ describe("social-security routes", () => {
         discounts: 16_824.665,
         netAmount: 30_620.458,
         ibcAmount: 12_248.183,
-        solidarityAmountTenths: 1_225,
+        solidarityAmount: 122.5,
       },
     })
     expect(prismaMock.prisma.invoice.findMany).toHaveBeenCalledWith(
@@ -108,18 +108,18 @@ describe("social-security routes", () => {
       discounts: 0,
       netAmount: 0,
       ibcAmount: 1_750.905,
-      healthAmountTenths: 2_189,
-      pensionAmountTenths: 2_802,
-      arlAmountTenths: 427,
-      fundAmountTenths: 0,
-      solidarityAmountTenths: 0,
-      totalAmountTenths: 5_418,
+      healthAmount: 218.9,
+      pensionAmount: 280.2,
+      arlAmount: 42.7,
+      fundAmount: 0,
+      solidarityAmount: 0,
+      totalAmount: 541.8,
     })
   })
 
   it("uses the saved monthly SMMLV snapshot instead of resolving a newer annual value", async () => {
     const savedPeriod = {
-      minimumWageCop: 1_750_905,
+      minimumWageAmount: 1_750.905,
       minimumWageSourceYear: 2026,
       minimumWageSourceUrl: "https://www.mintrabajo.gov.co/saved-2026",
       minimumWageStale: false,
@@ -135,7 +135,7 @@ describe("social-security routes", () => {
     expect(result.minimumWage).toEqual({
       year: 2026,
       sourceYear: 2026,
-      amountCop: 1_750_905,
+      amount: 1_750.905,
       sourceUrl: "https://www.mintrabajo.gov.co/saved-2026",
       stale: false,
     })
