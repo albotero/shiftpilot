@@ -2049,6 +2049,10 @@ a {
   border-bottom: 1px solid #e7ebe7;
 }
 
+.debt-card-detail-no-divider {
+  border-bottom: 0;
+}
+
 .debt-card-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;

@@ -114,7 +114,7 @@ export function DebtSummaryCard({ showDetailsLink = false }: { showDetailsLink?:
             </div>
           )}
         </div>
-        <div className="debt-card-detail">
+        <div className={`debt-card-detail${showDetailsLink ? "" : " debt-card-detail-no-divider"}`}>
           <div className="debt-card-row">
             <div className="debt-card-row-label">
               <span>Última transferencia</span>
