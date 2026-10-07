@@ -5,14 +5,16 @@ export function PageHeading({
   title,
   description,
   action,
+  className,
 }: {
   eyebrow: string
   title: ReactNode
   description: string
   action?: ReactNode
+  className?: string
 }) {
   return (
-    <section className="welcome-row">
+    <section className={`welcome-row ${className ?? ""}`.trim()}>
       <div>
         <p className="eyebrow">{eyebrow}</p>
         <h1>{title}</h1>

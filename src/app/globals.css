@@ -438,6 +438,14 @@ a {
   font-size: 12px;
 }
 
+.calendar-page-heading .eyebrow {
+  color: #88918b;
+}
+
+.calendar-page-heading .welcome-subtitle {
+  color: #78827d;
+}
+
 .primary-quick-add {
   min-height: 38px;
   padding: 0 14px;
@@ -870,7 +878,7 @@ a {
   width: 8px;
   height: 8px;
   flex: 0 0 auto;
-  border-radius: 50%;
+  border-radius: 3px;
 }
 
 .shared-calendar-grid-wrap .calendar-day {
@@ -945,6 +953,7 @@ a {
 
 .calendar-title-group .eyebrow {
   margin-bottom: 2px;
+  color: #88918b;
   font-size: 8px;
 }
 
@@ -3850,7 +3859,6 @@ a {
 
   .calendar-toolbar {
     min-height: 62px;
-    flex-wrap: wrap;
     padding: 10px;
   }
 
@@ -3868,23 +3876,18 @@ a {
     font-size: 13px;
   }
 
-  .calendar-month-picker {
-    height: 44px;
-  }
-
   .calendar-title-group .eyebrow {
     font-size: 7px;
   }
 
   .calendar-actions {
-    flex-wrap: wrap;
     gap: 4px;
   }
 
   .today-button,
   .month-arrows button {
-    min-width: 44px;
-    height: 44px;
+    min-width: 27px;
+    height: 27px;
   }
 
   .today-button {
@@ -3893,21 +3896,19 @@ a {
   }
 
   .add-entry-button {
-    width: 44px;
-    min-width: 44px;
-    height: 44px;
+    width: 29px;
+    min-width: 29px;
+    height: 29px;
     padding: 0;
     font-size: 0;
   }
 
-  .calendar-share-button {
-    width: 44px;
-    min-height: 44px;
-    padding: 0;
-  }
-
   .add-entry-button svg {
     flex: 0 0 auto;
+  }
+
+  .add-entry-button span {
+    display: none;
   }
 
   .calendar-subtoolbar {
@@ -3922,22 +3923,20 @@ a {
   }
 
   .view-switch button {
-    min-width: 44px;
-    min-height: 44px;
-    padding: 0 10px;
+    min-height: 24px;
+    padding: 0 7px;
     font-size: 8px;
   }
 
   .calendar-filters {
     justify-content: flex-end;
-    gap: 1px;
+    gap: 2px;
   }
 
   .filter-chip {
-    min-width: 44px;
-    min-height: 44px;
+    min-height: 24px;
     justify-content: center;
-    gap: 3px;
+    gap: 0;
     padding: 0 3px;
     font-size: 0;
   }
@@ -3996,13 +3995,13 @@ a {
   }
 
   .calendar-day {
-    min-height: 89px;
+    min-height: 67px;
     padding: 4px 3px;
   }
 
   .day-number {
-    width: min(44px, 100%);
-    height: 44px;
+    width: 19px;
+    height: 19px;
     font-size: 9px;
   }
 
@@ -4017,10 +4016,9 @@ a {
   }
 
   .day-entry {
-    min-height: 36px;
-    padding: 3px;
-    font-size: 7px;
-    touch-action: manipulation;
+    min-height: 13px;
+    padding: 1px 3px;
+    font-size: 6px;
   }
 
   .day-entry-time {
@@ -4030,9 +4028,17 @@ a {
   .more-entries {
     display: inline-flex;
     width: 100%;
-    min-height: 44px;
+    min-height: 13px;
     align-items: center;
-    touch-action: manipulation;
+    padding: 0 3px;
+    border: 0;
+    border-radius: 2px;
+    background: transparent;
+    color: #536258;
+    font-size: 6px;
+    font-weight: 600;
+    line-height: 1;
+    text-align: left;
   }
 
   .day-add {
@@ -4305,9 +4311,9 @@ a {
   }
 
   .calendar-share-button {
-    width: 44px;
-    min-width: 44px;
-    min-height: 44px;
+    width: 29px;
+    min-width: 29px;
+    min-height: 29px;
     padding: 0;
   }
 
@@ -4318,11 +4324,8 @@ a {
   .breadcrumb,
   .welcome-subtitle,
   .dashboard-footer,
-  .calendar-footnote,
   .coverage-summary-note,
   .coverage-summary-empty,
-  .view-switch button,
-  .weekday-row span,
   .annual-plan-help,
   .replacement-people-empty,
   .monthly-report-period,
@@ -4346,10 +4349,6 @@ a {
   .payment-split,
   .debt-no-late-interest,
   .mobile-bottom-nav a {
-    color: #536258;
-  }
-
-  .calendar-day:not(.is-today) .day-number:not(.holiday) {
     color: #536258;
   }
 
@@ -4483,7 +4482,7 @@ a {
   }
 
   .calendar-filters {
-    gap: 0;
+    gap: 1px;
   }
 }
 

@@ -25,7 +25,12 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
 
   return (
     <>
-      <PageHeading eyebrow="Tu agenda" title="Calendario" description="Turnos, eventos y disponibilidad." />
+      <PageHeading
+        className="calendar-page-heading"
+        eyebrow="Tu agenda"
+        title="Calendario"
+        description="Turnos, eventos y disponibilidad."
+      />
       <CalendarWorkspace
         initialDate={validDateKey(firstValue(params.date))}
         initialView={initialView}
