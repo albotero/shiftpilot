@@ -130,6 +130,12 @@ button {
   color: inherit;
 }
 
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid #315f44;
+  outline-offset: 2px;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -405,7 +411,7 @@ a {
 
 .eyebrow {
   margin: 0 0 7px;
-  color: #88918b;
+  color: #536258;
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.85px;
@@ -2469,12 +2475,14 @@ a {
 
 .settings-page-content {
   display: grid;
+  min-width: 0;
   gap: 24px;
   margin-top: 18px;
 }
 
 .settings-category {
   display: grid;
+  min-width: 0;
   gap: 8px;
 }
 
@@ -2487,6 +2495,7 @@ a {
 
 .settings-category-content {
   display: grid;
+  min-width: 0;
   gap: 10px;
 }
 
@@ -3689,6 +3698,10 @@ a {
 }
 
 @media (max-width: 720px) {
+  .nav-link {
+    min-height: 44px;
+  }
+
   .sidebar {
     width: 245px;
     transform: translateX(-100%);
@@ -3702,8 +3715,8 @@ a {
 
   .mobile-sidebar-close {
     display: grid;
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
     flex: none;
     place-items: center;
     border: 1px solid #ffffff30;
@@ -3724,8 +3737,8 @@ a {
 
   .mobile-menu-button {
     display: grid;
-    width: 31px;
-    height: 31px;
+    width: 44px;
+    height: 44px;
     place-items: center;
     border: 1px solid #e0e5dd;
     border-radius: 5px;
@@ -3744,9 +3757,13 @@ a {
   }
 
   .quick-add-top {
-    min-width: 33px;
-    height: 32px;
+    min-width: 44px;
+    height: 44px;
     padding: 0 8px;
+  }
+
+  .brand {
+    min-height: 44px;
   }
 
   .dashboard-content {
@@ -3770,9 +3787,9 @@ a {
   }
 
   .welcome-row > .primary-quick-add {
-    width: 37px;
-    min-width: 37px;
-    height: 37px;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
     padding: 0;
     overflow: hidden;
     color: transparent;
@@ -3823,12 +3840,17 @@ a {
     padding: 3px 4px;
   }
 
+  .stat-card-action {
+    min-height: 44px;
+  }
+
   .dashboard-columns {
     gap: 10px;
   }
 
   .calendar-toolbar {
     min-height: 62px;
+    flex-wrap: wrap;
     padding: 10px;
   }
 
@@ -3846,18 +3868,23 @@ a {
     font-size: 13px;
   }
 
+  .calendar-month-picker {
+    height: 44px;
+  }
+
   .calendar-title-group .eyebrow {
     font-size: 7px;
   }
 
   .calendar-actions {
+    flex-wrap: wrap;
     gap: 4px;
   }
 
   .today-button,
   .month-arrows button {
-    min-width: 27px;
-    height: 27px;
+    min-width: 44px;
+    height: 44px;
   }
 
   .today-button {
@@ -3866,11 +3893,17 @@ a {
   }
 
   .add-entry-button {
-    width: 29px;
-    min-width: 29px;
-    height: 29px;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
     padding: 0;
     font-size: 0;
+  }
+
+  .calendar-share-button {
+    width: 44px;
+    min-height: 44px;
+    padding: 0;
   }
 
   .add-entry-button svg {
@@ -3889,8 +3922,9 @@ a {
   }
 
   .view-switch button {
-    min-height: 24px;
-    padding: 0 7px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0 10px;
     font-size: 8px;
   }
 
@@ -3900,10 +3934,52 @@ a {
   }
 
   .filter-chip {
-    min-height: 24px;
+    min-width: 44px;
+    min-height: 44px;
+    justify-content: center;
     gap: 3px;
     padding: 0 3px;
     font-size: 0;
+  }
+
+  .icon-button,
+  .small-add-button {
+    min-width: 44px;
+    height: 44px;
+  }
+
+  .invoice-row-actions .icon-button,
+  .replacement-person-row-actions .icon-button {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+  }
+
+  .date-input-control {
+    grid-template-columns: minmax(0, 1fr) 44px;
+  }
+
+  .date-input-picker {
+    width: 44px;
+    min-height: 44px;
+  }
+
+  .form-field input,
+  .form-field select,
+  .form-field textarea,
+  .submit-button,
+  .cancel-button {
+    min-height: 44px;
+  }
+
+  .finance-month-picker input,
+  .invoice-import-button,
+  .invoice-secondary-button,
+  .debt-link,
+  .empty-agenda button,
+  .empty-upcoming button,
+  .empty-upcoming a {
+    min-height: 44px;
   }
 
   .filter-dot {
@@ -3920,13 +3996,13 @@ a {
   }
 
   .calendar-day {
-    min-height: 67px;
+    min-height: 89px;
     padding: 4px 3px;
   }
 
   .day-number {
-    width: 19px;
-    height: 19px;
+    width: min(44px, 100%);
+    height: 44px;
     font-size: 9px;
   }
 
@@ -3941,14 +4017,22 @@ a {
   }
 
   .day-entry {
-    min-height: 13px;
-    padding: 1px 3px;
-    font-size: 6px;
+    min-height: 36px;
+    padding: 3px;
+    font-size: 7px;
+    touch-action: manipulation;
   }
 
-  .day-entry-time,
-  .more-entries {
+  .day-entry-time {
     display: none;
+  }
+
+  .more-entries {
+    display: inline-flex;
+    width: 100%;
+    min-height: 44px;
+    align-items: center;
+    touch-action: manipulation;
   }
 
   .day-add {
@@ -4221,18 +4305,165 @@ a {
   }
 
   .calendar-share-button {
-    width: 29px;
-    min-width: 29px;
-    min-height: 29px;
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
     padding: 0;
   }
 
   .calendar-share-button span {
     display: none;
   }
+
+  .breadcrumb,
+  .welcome-subtitle,
+  .dashboard-footer,
+  .calendar-footnote,
+  .coverage-summary-note,
+  .coverage-summary-empty,
+  .view-switch button,
+  .weekday-row span,
+  .annual-plan-help,
+  .replacement-people-empty,
+  .monthly-report-period,
+  .invoice-empty,
+  .finance-month-picker,
+  .form-field label,
+  .coverage-rate-history thead th,
+  .invoice-calculation div,
+  .stat-heading,
+  .stat-value small,
+  .stat-foot,
+  .today-summary-metrics span,
+  .empty-upcoming,
+  .upcoming-copy span,
+  .debt-rate,
+  .debt-card-title,
+  .debt-card-as-of,
+  .debt-card-value small,
+  .debt-card-row-label,
+  .last-payment,
+  .payment-split,
+  .debt-no-late-interest,
+  .mobile-bottom-nav a {
+    color: #536258;
+  }
+
+  .calendar-day:not(.is-today) .day-number:not(.holiday) {
+    color: #536258;
+  }
+
+  .stat-trend {
+    color: #93442c;
+  }
+
+  .stat-trend.blue-text {
+    color: #245b70;
+  }
+
+  .stat-trend.green-text {
+    color: #416c35;
+  }
+
+  .stat-trend.violet-text {
+    color: #5c4c84;
+  }
 }
 
 @media (max-width: 360px) {
+  .topbar {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .mobile-menu-button {
+    flex: 0 0 44px;
+  }
+
+  .breadcrumb {
+    min-width: 0;
+    gap: 6px;
+  }
+
+  .breadcrumb strong {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .welcome-row {
+    flex-wrap: wrap;
+  }
+
+  .welcome-row > .finance-page-actions {
+    width: 100%;
+    min-width: 0;
+    align-items: flex-start;
+    margin-left: 0;
+  }
+
+  .finance-page-actions .stat-trend {
+    max-width: 100%;
+    flex-wrap: wrap;
+    white-space: normal;
+  }
+
+  .settings-page-content,
+  .settings-category,
+  .settings-category-content {
+    min-width: 0;
+  }
+
+  .settings-category-content > * {
+    min-width: 0;
+  }
+
+  .annual-plan-panel,
+  .replacement-people-panel,
+  .social-security-panel {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .replacement-people-heading {
+    flex-wrap: wrap;
+  }
+
+  .replacement-people-heading > div {
+    flex: 1 1 110px;
+    min-width: 0;
+  }
+
+  .replacement-add-button {
+    flex: 1 0 100%;
+    min-height: 44px;
+    justify-content: center;
+  }
+
+  .annual-plan-grid,
+  .social-security-rate-grid,
+  .form-row,
+  .coverage-rate-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .invoice-item-row,
+  .invoice-item-row.has-line-discount {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .invoice-item-description,
+  .invoice-item-discount,
+  .invoice-item-total,
+  .invoice-remove-item {
+    grid-column: 1;
+  }
+
+  .invoice-remove-item {
+    justify-self: end;
+  }
+
   .dashboard-content {
     padding-right: 8px;
     padding-left: 8px;

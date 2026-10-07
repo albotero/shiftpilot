@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState, type FormEvent } from "react"
+import { useEffect, useRef, useState, type FormEvent } from "react"
 import Link from "next/link"
 import { RotateCcw, Trash2, X } from "lucide-react"
 import { DateInput } from "@/components/forms/DateInput"
@@ -52,6 +52,8 @@ function createEntryId() {
 }
 
 export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onDelete }: QuickAddDialogProps) {
+  const dialogRef = useRef<HTMLElement>(null)
+  const onCloseRef = useRef(onClose)
   const isEditing = Boolean(initialEntry)
   const [kind, setKind] = useState<CalendarEntryKind>(initialEntry?.kind ?? "SOMA")
   const [status, setStatus] = useState<SomaFormStatus>(() =>
@@ -126,6 +128,59 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
     initialEntry.status &&
     !shiftStatuses.includes(initialEntry.status),
   )
+
+  useEffect(() => {
+    onCloseRef.current = onClose
+  }, [onClose])
+
+  useEffect(() => {
+    const dialogElement = dialogRef.current
+    if (!dialogElement) return
+
+    const previouslyFocused = document.activeElement
+    const getFocusableElements = () =>
+      [
+        ...dialogElement.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ].filter((element) => {
+        const bounds = element.getBoundingClientRect()
+        return getComputedStyle(element).visibility !== "hidden" && bounds.width > 1 && bounds.height > 1
+      })
+
+    getFocusableElements()[0]?.focus()
+
+    function handleDialogKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        event.preventDefault()
+        onCloseRef.current()
+        return
+      }
+      if (event.key !== "Tab") return
+
+      const focusableElements = getFocusableElements()
+      const first = focusableElements[0]
+      const last = focusableElements.at(-1)
+      if (!first || !last) return
+
+      if (!dialogElement?.contains(document.activeElement)) {
+        event.preventDefault()
+        ;(event.shiftKey ? last : first).focus()
+      } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault()
+        last.focus()
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault()
+        first.focus()
+      }
+    }
+
+    document.addEventListener("keydown", handleDialogKeyDown)
+    return () => {
+      document.removeEventListener("keydown", handleDialogKeyDown)
+      if (previouslyFocused instanceof HTMLElement && previouslyFocused.isConnected) previouslyFocused.focus()
+    }
+  }, [])
 
   useEffect(() => {
     if (!isCoverageStatus) return
@@ -331,7 +386,14 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
       role="presentation"
       onMouseDown={(event) => event.target === event.currentTarget && onClose()}
     >
-      <section className="quick-add-dialog" role="dialog" aria-modal="true" aria-labelledby="quick-add-title">
+      <section
+        ref={dialogRef}
+        className="quick-add-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="quick-add-title"
+        tabIndex={-1}
+      >
         <div className="dialog-header">
           <div>
             <p className="eyebrow">Registro nuevo</p>
