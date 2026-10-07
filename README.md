@@ -85,6 +85,14 @@ La auditoría de Fase 14 amplía las suites existentes de Vitest con fronteras d
 
 Los tests de rutas simulan Prisma: no certifican migraciones, aislamiento de transacciones, concurrencia ni rollback sobre PostgreSQL real. Esa verificación requiere una base de prueba aislada; no ejecutar pruebas de escritura contra producción.
 
+### Auditoría de dependencias
+
+Revisión del 2026-10-07: Vitest se actualizó a 4.1.11 para eliminar la cadena vulnerable de `tinypool` (contaminación de prototipos/RCE) y corregir la lectura arbitraria de archivos del mocker. Prisma 6 conserva su versión; un override limitado a `@prisma/config` fija `deepmerge-ts` 8.0.0, que protege las fusiones de objetos recursivos. Generación de cliente y validación del esquema verificadas.
+
+`npm audit --omit=dev` no reporta vulnerabilidades en el árbol de producción auditado. La auditoría completa conserva 9 avisos altos derivados de un único problema sin versión corregida publicada: agotamiento de pila con patrones anidados en `braces` 3.0.3 (GHSA-vfj7-8cjw-p6xm), usado por fast-glob/micromatch en ESLint/Next y shadcn. No se trata de nueve fallos independientes. No proceses patrones glob de fuentes no confiables con esas herramientas. La imagen Docker también instala herramientas de desarrollo; que el audit de producción esté limpio no equivale a eliminarlas de la imagen ni a demostrar ausencia de exposición.
+
+No usar `npm audit fix --force`: las soluciones sugeridas incluyen rebajas incompatibles de herramientas. Repite `npm audit` al actualizar dependencias y retira el override cuando Prisma incorpore nativamente una versión corregida. El resolvedor de peers de npm 10 falló al actualizar Vitest; el lockfile se resolvió con npm 11 temporal (`npx --yes --package=npm@11 npm install`), manteniendo Node 22. La instalación reproducible se comprueba con `npm ci`.
+
 Para cambiar el esquema durante el desarrollo, crea una migración con un nombre descriptivo:
 
 ```bash
