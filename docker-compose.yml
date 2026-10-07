@@ -26,7 +26,7 @@ services:
       TELEGRAM_BOT_CONFIGURED: ${TELEGRAM_BOT_TOKEN:+true}
       TELEGRAM_BOT_USERNAME: ${TELEGRAM_BOT_USERNAME:-}
     ports:
-      - "${SHIFTPILOT_BIND_ADDRESS:-127.0.0.1}:3000:3000"
+      - "${SHIFTPILOT_BIND_ADDRESS:-127.0.0.1}:${SHIFTPILOT_PORT:-3000}:3000"
 
   telegram-reminders:
     image: shiftpilot-app

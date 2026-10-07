@@ -40,7 +40,7 @@ Requisitos: Docker Engine y Docker Compose v2.
 docker compose up -d --build
 ```
 
-La aplicación queda en <http://localhost:3000>. Compose inicia PostgreSQL, espera a que esté saludable, aplica las migraciones y ejecuta el seed antes de arrancar Next.js. El valor predeterminado de `SHIFTPILOT_BIND_ADDRESS` es `127.0.0.1`, y el puerto de PostgreSQL no se publica en el host.
+La aplicación queda en <http://localhost:3000>. Compose inicia PostgreSQL, espera a que esté saludable y aplica las migraciones antes de arrancar Next.js. No ejecuta el seed: para una base nueva, carga los datos revisados con `docker compose run --rm --no-deps app npm run db:seed`. El valor predeterminado de `SHIFTPILOT_BIND_ADDRESS` es `127.0.0.1`; `SHIFTPILOT_PORT` permite cambiar el puerto sin afectar el 3000 interno. PostgreSQL no se publica en el host.
 
 Para detener los servicios sin borrar los datos:
 
@@ -131,6 +131,22 @@ docker compose ps
 docker compose logs -f app
 ```
 
+### Actualizar una instancia existente
+
+Antes de actualizar, crea y verifica una copia de seguridad, comprueba espacio libre y revisa las migraciones incluidas. Conserva una referencia a la imagen anterior para un posible rollback compatible con el esquema. No ejecutes el seed durante una actualización.
+
+Para cambios de la aplicación que no requieren reiniciar otros servicios:
+
+```bash
+git pull --ff-only
+docker compose build app
+docker compose up -d --no-deps --force-recreate app
+docker compose ps
+docker compose logs --tail=80 app
+```
+
+El arranque aplica las migraciones pendientes antes de iniciar Next.js. Comprueba las páginas y APIs afectadas después de actualizar. Un rollback de imagen no revierte migraciones: antes de usar la imagen anterior verifica su compatibilidad con la base actual. No restaures un backup sobre la base activa para resolver un error de interfaz. DB y `telegram-reminders` no se recrean con los comandos anteriores; si cambia el código/configuración del worker, su actualización es un paso separado.
+
 ### Recordatorios por Telegram
 
 Los recordatorios están apagados por defecto en cada evento. Al activarlos, el worker de Compose envía el aviso en hora de Colombia y registra cada ocurrencia para evitar reenvíos. En eventos sin hora, "minutos antes" toma las 5:00 a. m. como hora de inicio.
@@ -167,26 +183,62 @@ La aplicación no tiene login, roles ni control de acceso. Mantén el servicio e
 
 ## Copias de seguridad
 
-Con Compose activo, crea una copia SQL usando las credenciales configuradas en el servicio de base:
+Con Compose activo, crea una copia en formato custom usando las credenciales del servicio de base. Estos comandos están pensados para Bash; el archivo queda privado y sólo recibe su nombre definitivo si `pg_dump` termina correctamente:
 
 ```bash
+set -euo pipefail
+umask 077
 mkdir -p backups
-docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" "$POSTGRES_DB"' > "backups/shiftpilot-$(date +%Y%m%d-%H%M%S).sql"
+backup="$PWD/backups/shiftpilot-$(date +%Y%m%d-%H%M%S).dump"
+docker compose exec -T db sh -c 'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" --format=custom --no-owner --no-acl' > "$backup.partial" &&
+	test -s "$backup.partial" && mv "$backup.partial" "$backup" &&
+	sha256sum "$backup" > "$backup.sha256"
+sha256sum --check "$backup.sha256"
 ```
 
-Restaura en una base vacía:
+Si el dump falla, no uses el archivo `.partial`. La copia contiene esquema, datos, secuencias y el historial de migraciones; no contiene roles globales, contraseñas ni configuración de `.env`. La omisión de propietarios/permisos permite restaurar bajo el usuario de la instancia destino. Protege también `.env` por separado.
+
+### Ensayar una restauración aislada
+
+No apuntes estos comandos al proyecto productivo. Usa un nombre de proyecto independiente, credenciales nuevas en `.env.restore`, `SHIFTPILOT_BIND_ADDRESS=127.0.0.1` y un `SHIFTPILOT_PORT` libre, por ejemplo `3100`. No copies el token de Telegram ni inicies el worker. Usa una shell sin variables exportadas de producción que puedan sobrescribir `.env.restore`.
 
 ```bash
-docker compose exec -T db sh -c 'psql -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB"' < backups/shiftpilot-YYYYMMDD-HHMMSS.sql
+set -euo pipefail
+umask 077
+cp .env.example .env.restore
+# Configura .env.restore antes de continuar.
+backup="$PWD/backups/shiftpilot-YYYYMMDD-HHMMSS.dump"
+sha256sum --check "$backup.sha256"
+docker compose -p shiftpilot-restore --env-file .env.restore up -d --wait db
+
+tables="$(docker compose -p shiftpilot-restore --env-file .env.restore exec -T db sh -c 'psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atc "SELECT count(*) FROM pg_tables WHERE schemaname = current_schema();"')"
+[[ "$tables" = 0 ]] || { printf 'La base destino no esta vacia; abortar.\n'; exit 1; }
+
+docker compose -p shiftpilot-restore --env-file .env.restore exec -T db sh -c 'pg_restore -U "$POSTGRES_USER" -d "$POSTGRES_DB" --no-owner --no-acl --exit-on-error --single-transaction' < "$backup"
+docker compose -p shiftpilot-restore --env-file .env.restore build app
+docker compose -p shiftpilot-restore --env-file .env.restore up -d --wait app
+docker compose -p shiftpilot-restore --env-file .env.restore ps
 ```
 
-Guarda las copias fuera del volumen del servidor, protégelas como datos privados y verifica periódicamente una restauración.
+No ejecutes seed sobre una restauración. Verifica el historial de migraciones, recuentos y contenido de tablas, importes con decimales y las APIs, no sólo que PostgreSQL arranque. Para backups SQL antiguos usa `psql -v ON_ERROR_STOP=1 --single-transaction` en una base destino igualmente vacía y aislada; no uses `pg_restore` con un archivo SQL plano.
+
+Tras verificar el resultado, elimina únicamente los recursos del ensayo:
+
+```bash
+docker compose -p shiftpilot-restore --env-file .env.restore down --volumes
+```
+
+`--volumes` destruye la copia restaurada: no omitas el nombre de proyecto ni lo ejecutes en producción. Conserva el dump y su checksum fuera del volumen de PostgreSQL, y otra copia cifrada fuera del servidor. No subas datos ni credenciales a Git. Cuando cambies de ubicación el dump, adapta la ruta registrada en el manifiesto de checksum o compara manualmente el hash esperado.
+
+### Verificación de Fase 15
+
+Ensayo del 2026-10-07 sobre PostgreSQL 16: instalación desde base vacía con 19 migraciones, cero sedes antes del seed explícito y dos ejecuciones de seed sin duplicar las 2 sedes, 1 deuda, 72 cuotas y 1 pago. Una copia productiva nueva se restauró en otra base del contenedor de prueba mediante `pg_restore --single-transaction`; recuentos y huellas de contenido coincidieron en las 38 tablas públicas. La app arrancó contra la copia restaurada sin migraciones pendientes y sus páginas/APIs respondieron correctamente. El proyecto de ensayo, su volumen y su imagen se retiraron; los contenedores productivos no se reiniciaron. Esta prueba no certifica concurrencia de escrituras, rollback de transacciones de negocio ni recuperación ante pérdida completa del servidor.
 
 ## Alcance actual
 
 Implementado: calendario mensual, semanal y agenda; turnos Soma, reservas, eventos, vacaciones y cobertura; persistencia vía PostgreSQL con fallback local; facturación end-to-end con CRUD, partidas, cálculos por tipo, vencimientos y resumen mensual; seguridad social mensual integrada con facturación, piso SMMLV consultado a MinTrabajo, tasas editables, redondeo por componente y persistencia idempotente; cálculos base de deuda y carga del plan original.
 
-Pendiente: reportes y auditoría final responsive/accesible. Seguridad social se recalcula con el CRUD de facturas y se persiste por mes.
+Reportes mensuales, ajustes móviles y auditoría de tests están implementados. Seguridad social se recalcula con el CRUD de facturas y se persiste por mes. Quedan pendientes pruebas físicas en iPhone/VoiceOver, integración de escrituras concurrentes contra PostgreSQL aislado y validar el resguardo cifrado de backups fuera del servidor.
 
 ### Fase 9 — Seguridad social (CERRADA)
 
