@@ -124,7 +124,7 @@ export function TelegramConnectionCard() {
           <p className="annual-plan-message" role="status">
             Telegram conectado{connection.botUsername ? ` · @${connection.botUsername}` : ""}
           </p>
-          <button type="button" className="cancel-button" onClick={() => void unlinkTelegram()} disabled={saving}>
+          <button type="button" className="delete-button" onClick={() => void unlinkTelegram()} disabled={saving}>
             <Unlink size={14} /> Desvincular chat
           </button>
         </div>
