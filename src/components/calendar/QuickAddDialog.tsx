@@ -370,7 +370,7 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
             <>
               <div className="form-row">
                 <label className="form-field">
-                  <span>Tipo de turno o reserva</span>
+                  <span>Tipo de turno</span>
                   <select
                     value={status}
                     onChange={(event) => {

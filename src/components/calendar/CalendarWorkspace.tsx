@@ -5,6 +5,7 @@ import { addDays } from "date-fns"
 import Link from "next/link"
 import { TriangleAlert } from "lucide-react"
 import { CalendarPanel } from "@/components/calendar/CalendarPanel"
+import { CoveredShiftSummary } from "@/components/calendar/CoveredShiftSummary"
 import { QuickAddDialog } from "@/components/calendar/QuickAddDialog"
 import {
   addCalendarEntry,
@@ -137,6 +138,7 @@ export function CalendarWorkspace({
         onEdit={startEditingEntry}
         onFiltersChange={setFilters}
       />
+      <CoveredShiftSummary entries={allEntries} month={activeDate} />
       {dialogDate && (
         <QuickAddDialog
           initialDate={dialogDate}

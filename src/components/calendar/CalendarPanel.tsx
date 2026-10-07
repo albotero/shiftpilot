@@ -313,7 +313,8 @@ export function CalendarPanel({
           Turno
         </span>
         <span>
-          <i className="legend-swatch reservation" />R son reservas de Soma
+          <i className="legend-swatch reservation-range" />
+          Turnos R1–R5
         </span>
         <span>
           <i className="legend-swatch other-shift" />

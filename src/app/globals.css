@@ -634,6 +634,108 @@ a {
   overflow: hidden;
 }
 
+.coverage-summary-panel {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+  padding: 16px;
+  border: 1px solid #e3e8e1;
+  border-radius: 7px;
+  background: #fff;
+}
+
+.coverage-summary-heading {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px 16px;
+}
+
+.coverage-summary-heading h2 {
+  margin: 0;
+  color: #263630;
+  font-size: 14px;
+  font-weight: 650;
+  text-transform: capitalize;
+}
+
+.coverage-summary-rate {
+  color: #435c48;
+  font-size: 11px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.coverage-summary-note {
+  margin: -5px 0 0;
+  color: #7c8780;
+  font-size: 9px;
+}
+
+.coverage-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.coverage-summary-table th,
+.coverage-summary-table td {
+  padding: 8px 4px;
+  border-bottom: 1px solid #edf0eb;
+  font-size: 10px;
+}
+
+.coverage-summary-table thead th {
+  color: #78837c;
+  font-size: 9px;
+  font-weight: 600;
+  text-align: left;
+}
+
+.coverage-summary-table thead th:nth-child(2),
+.coverage-summary-table tbody td:nth-child(2),
+.coverage-summary-table tfoot td:nth-child(2) {
+  width: 92px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.coverage-summary-table thead th:last-child,
+.coverage-summary-table tbody td:last-child,
+.coverage-summary-table tfoot td:last-child {
+  width: 150px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.coverage-summary-table tbody th {
+  overflow-wrap: anywhere;
+  color: #34483b;
+  font-weight: 600;
+  text-align: left;
+}
+
+.coverage-summary-table tbody td {
+  color: #59675e;
+}
+
+.coverage-summary-table tfoot th,
+.coverage-summary-table tfoot td {
+  padding-top: 10px;
+  border-bottom: 0;
+  color: #263c36;
+  font-weight: 700;
+}
+
+.coverage-summary-empty {
+  margin: 0;
+  padding: 12px 0 2px;
+  color: #7c8780;
+  font-size: 10px;
+}
+
 .shared-calendar-page {
   min-height: 100vh;
   padding: 22px;
@@ -1166,6 +1268,52 @@ a {
 .upcoming-mark.shift {
   background: #233f76;
   color: white;
+}
+
+.entry-dot.reservation-r1,
+.upcoming-mark.reservation-r1,
+.day-entry.reservation-r1 {
+  background: #7d68b6;
+}
+
+.entry-dot.reservation-r2,
+.upcoming-mark.reservation-r2,
+.day-entry.reservation-r2 {
+  background: #9b85c8;
+}
+
+.entry-dot.reservation-r3,
+.upcoming-mark.reservation-r3,
+.day-entry.reservation-r3 {
+  background: #ac99d3;
+}
+
+.entry-dot.reservation-r4,
+.upcoming-mark.reservation-r4,
+.day-entry.reservation-r4 {
+  background: #bbaadc;
+}
+
+.entry-dot.reservation-r5,
+.upcoming-mark.reservation-r5,
+.day-entry.reservation-r5 {
+  background: #c6b9e3;
+}
+
+.day-entry.reservation-r1 {
+  color: #fff;
+}
+
+.day-entry.reservation-r2,
+.day-entry.reservation-r3,
+.day-entry.reservation-r4,
+.day-entry.reservation-r5 {
+  color: var(--ink);
+}
+
+.legend-swatch.reservation-range {
+  width: 24px;
+  background: linear-gradient(90deg, #7d68b6, #9b85c8, #ac99d3, #bbaadc, #c6b9e3);
 }
 
 .day-entry.other-shift,
@@ -2318,6 +2466,19 @@ a {
   gap: 12px;
 }
 
+.coverage-rate-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 11px;
+}
+
+.coverage-rate-form > .annual-plan-help,
+.coverage-rate-form > .form-error,
+.coverage-rate-form > .annual-plan-message,
+.coverage-rate-form > .annual-plan-actions {
+  grid-column: 1 / -1;
+}
+
 .annual-plan-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -2345,6 +2506,69 @@ a {
 .annual-plan-actions {
   display: flex;
   justify-content: flex-end;
+  gap: 8px;
+}
+
+.coverage-rate-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 10px;
+  border: 1px solid #e0e6de;
+  border-radius: 5px;
+  background: #fff;
+  color: #657269;
+  cursor: pointer;
+  font-size: 10px;
+}
+
+.coverage-rate-history-wrap {
+  overflow-x: auto;
+}
+
+.coverage-rate-history {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.coverage-rate-history th,
+.coverage-rate-history td {
+  padding: 8px 5px;
+  border-bottom: 1px solid #edf0eb;
+  font-size: 10px;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.coverage-rate-history thead th {
+  color: #78837c;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.coverage-rate-history tbody th {
+  color: #34483b;
+  font-weight: 600;
+}
+
+.coverage-rate-history td:nth-child(2) {
+  color: #34483b;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.coverage-rate-history th:last-child,
+.coverage-rate-history td:last-child {
+  width: 76px;
+  text-align: right;
+}
+
+.coverage-rate-row-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
 }
 
 .replacement-people-panel {
@@ -3642,6 +3866,10 @@ a {
 
   .annual-plan-panel {
     padding: 13px;
+  }
+
+  .coverage-rate-form {
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .invoice-manager {

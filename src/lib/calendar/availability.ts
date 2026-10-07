@@ -1,6 +1,6 @@
 import type { CalendarEntry, ShiftPeriod } from "./types"
 
-export type AvailabilityState = "LIBRE" | "RESERVA" | "OCUPADO" | "EVENTO" | "VACACIONES"
+export type AvailabilityState = "LIBRE" | "OCUPADO" | "EVENTO" | "VACACIONES"
 
 export type ShiftWindow = {
   startTime: string
@@ -22,7 +22,18 @@ export type ScheduleConflict = {
   type: "HORARIO" | "VACACIONES"
 }
 
-const occupiedSomaStatuses = new Set(["TURNO", "NOCHE", "TURNO_DE_OTRA_PERSONA", "EXTERNO", "EXTERNO_NOCHE"])
+const occupiedSomaStatuses = new Set([
+  "TURNO",
+  "NOCHE",
+  "R1",
+  "R2",
+  "R3",
+  "R4",
+  "R5",
+  "TURNO_DE_OTRA_PERSONA",
+  "EXTERNO",
+  "EXTERNO_NOCHE",
+])
 
 function includesDate(entry: CalendarEntry, date: string) {
   const endDate = entry.endDate ?? (entry.kind === "VACACIONES" ? "9999-12-31" : entry.date)
@@ -44,7 +55,6 @@ export function getDayAvailability(entries: CalendarEntry[], date: string): Avai
   if (dayEntries.some((entry) => entry.kind === "SOMA" && entry.status && occupiedSomaStatuses.has(entry.status)))
     return "OCUPADO"
   if (entries.some((entry) => isNightCarryover(entry, date))) return "OCUPADO"
-  if (dayEntries.some((entry) => entry.kind === "SOMA" && entry.status?.startsWith("R"))) return "RESERVA"
   if (dayEntries.some((entry) => entry.kind === "SEDARTE" || entry.kind === "PERSONAL")) return "EVENTO"
   if (
     dayEntries.some(

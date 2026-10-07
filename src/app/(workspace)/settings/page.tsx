@@ -1,6 +1,7 @@
 import { ReplacementPeopleManager } from "@/components/calendar/ReplacementPeopleManager"
 import { SomaAnnualPlanForm } from "@/components/calendar/SomaAnnualPlanForm"
 import { PageHeading } from "@/components/dashboard/PageHeading"
+import { CoveredShiftRateSettingsManager } from "@/components/settings/CoveredShiftRateSettingsManager"
 import { ParkingRateSettingsManager } from "@/components/settings/ParkingRateSettingsManager"
 import { SocialSecuritySettingsManager } from "@/components/settings/SocialSecuritySettingsManager"
 import { TelegramConnectionCard } from "@/components/settings/TelegramConnectionCard"
@@ -26,6 +27,7 @@ export default function SettingsPage() {
           <div className="settings-category-content">
             <SocialSecuritySettingsManager />
             <ParkingRateSettingsManager />
+            <CoveredShiftRateSettingsManager />
           </div>
         </section>
         <section className="settings-category" aria-labelledby="settings-notifications-title">

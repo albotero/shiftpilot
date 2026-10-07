@@ -9,6 +9,7 @@ import {
   getMonthSomaShiftCount,
   isSomaWorkStatus,
 } from "@/lib/calendar/utils"
+import { getCoveredShiftSummary } from "@/lib/calendar/coverage-compensation"
 import type { CalendarEntry } from "@/lib/calendar/types"
 
 const reservedShift: CalendarEntry = {
@@ -47,13 +48,16 @@ describe("calendar availability", () => {
     expect(getCalendarEntryStartMinute(reservedPm)).toBe(780)
   })
 
-  it("keeps a Soma reservation distinct from free time", () => {
-    expect(getDayAvailability([reservedShift], "2026-10-05")).toBe("RESERVA")
-    expect(getDayAvailability([{ ...reservedShift, status: "R2" }], "2026-10-05")).toBe("RESERVA")
+  it("treats R1-R5 turn names as occupied shifts", () => {
+    const statuses = ["R1", "R2", "R3", "R4", "R5"] as const
+
+    expect(statuses.map((status) => getDayAvailability([{ ...reservedShift, status }], "2026-10-05"))).toEqual(
+      statuses.map(() => "OCUPADO"),
+    )
     expect(getDayAvailability([], "2026-10-05")).toBe("LIBRE")
   })
 
-  it("assigns progressively lighter tones from R1 through R5", () => {
+  it("preserves progressive R1-R5 tones while treating them as occupied work", () => {
     const statuses = ["R1", "R2", "R3", "R4", "R5"] as const
 
     expect(statuses.map((status) => getEntryTone({ ...reservedShift, status }))).toEqual([
@@ -63,6 +67,9 @@ describe("calendar availability", () => {
       "reservation-r4",
       "reservation-r5",
     ])
+    expect(statuses.map((status) => getDayAvailability([{ ...reservedShift, status }], "2026-10-05"))).toEqual(
+      statuses.map(() => "OCUPADO"),
+    )
   })
 
   it("marks an in-person Soma shift as occupied", () => {
@@ -97,7 +104,7 @@ describe("calendar availability", () => {
     expect(getEntryLabel({ ...coveredShift, anesthesiologist: " " })).toBe("PM")
     expect(getEntryTone(coveredShift)).toBe("other-shift")
     expect(getMonthSomaShiftCount([reservedShift, coveredShift, ownTurn], new Date("2026-10-01T12:00:00"))).toBe(2)
-    expect(getMonthShiftHours([coveredShift, ownTurn], new Date("2026-10-01T12:00:00"))).toBe(6)
+    expect(getMonthShiftHours([reservedShift, coveredShift, ownTurn], new Date("2026-10-01T12:00:00"))).toBe(12)
   })
 
   it("counts a shift worked for another person as work and occupied time", () => {
@@ -173,7 +180,7 @@ describe("calendar availability", () => {
     expect(conflicts).toMatchObject([{ date: "2026-10-05", type: "HORARIO" }])
   })
 
-  it("detects an Adicional AM reservation overlapping a timed personal event", () => {
+  it("detects an Adicional AM shift overlapping a timed personal event", () => {
     const additionalAm: CalendarEntry = { ...reservedShift, date: "2026-10-17", status: "R5", period: "AM" }
     const personal: CalendarEntry = {
       id: "personal-recurring",
@@ -229,6 +236,9 @@ describe("calendar availability", () => {
 
     expect(findScheduleConflicts([allDayEvent, workedShift])).toMatchObject([
       { date: "2026-10-05", firstEntryId: allDayEvent.id, secondEntryId: workedShift.id, type: "HORARIO" },
+    ])
+    expect(findScheduleConflicts([allDayEvent, reservedShift])).toMatchObject([
+      { date: "2026-10-05", firstEntryId: allDayEvent.id, secondEntryId: reservedShift.id, type: "HORARIO" },
     ])
     expect(findScheduleConflicts([allDayEvent, coveredBySomeoneElse])).toEqual([])
   })
@@ -325,7 +335,7 @@ describe("calendar availability", () => {
     expect(getDayAvailability([vacation], "2027-01-12")).toBe("VACACIONES")
   })
 
-  it("counts reservations as Soma turns and excludes LIBRE", () => {
+  it("counts R1-R5 turn names as worked hours and excludes LIBRE", () => {
     const entries: CalendarEntry[] = [
       reservedShift,
       { ...reservedShift, id: "r5-pm", status: "R5", period: "PM" },
@@ -335,6 +345,75 @@ describe("calendar availability", () => {
     ]
 
     expect(getMonthSomaShiftCount(entries, new Date("2026-10-01T12:00:00"))).toBe(3)
+    expect(getMonthShiftHours(entries, new Date("2026-10-01T12:00:00"))).toBe(18)
+  })
+
+  it("groups covered jornadas by anesthesiologist and values nights as two jornadas", () => {
+    const coveredEntries: CalendarEntry[] = [
+      { ...reservedShift, id: "patricia-am", status: "TURNO_OTRA_PERSONA", anesthesiologist: "Patricia" },
+      {
+        ...reservedShift,
+        id: "patricia-night",
+        status: "TURNO_OTRA_PERSONA",
+        period: "NOCHE",
+        anesthesiologist: " Patricia ",
+      },
+      { ...reservedShift, id: "sara-pm", status: "TURNO_OTRA_PERSONA", period: "PM", anesthesiologist: "Sara" },
+      { ...reservedShift, id: "uncovered", status: "TURNO_OTRA_PERSONA", period: "PM" },
+      { ...reservedShift, id: "own-turn", status: "TURNO", period: "PM", anesthesiologist: "No contar" },
+    ]
+
+    expect(
+      getCoveredShiftSummary(coveredEntries, new Date("2026-10-01T12:00:00"), [
+        { effectiveFrom: "1900-01-01", amount: 685_000 },
+      ]),
+    ).toEqual({
+      rows: [
+        { anesthesiologist: "Patricia", jornadas: 3, totalCop: 2_055_000 },
+        { anesthesiologist: "Sara", jornadas: 1, totalCop: 685_000 },
+        { anesthesiologist: "Sin nombre registrado", jornadas: 1, totalCop: 685_000 },
+      ],
+      totalJornadas: 5,
+      totalCop: 3_425_000,
+    })
+  })
+
+  it("keeps past covered jornadas at their original rate after a new rate takes effect", () => {
+    const coveredEntries: CalendarEntry[] = [
+      {
+        ...reservedShift,
+        id: "past-am",
+        date: "2026-10-06",
+        status: "TURNO_OTRA_PERSONA",
+        anesthesiologist: "Patricia",
+      },
+      {
+        ...reservedShift,
+        id: "today-pm",
+        date: "2026-10-07",
+        status: "TURNO_OTRA_PERSONA",
+        period: "PM",
+        anesthesiologist: "Patricia",
+      },
+      {
+        ...reservedShift,
+        id: "future-double",
+        date: "2026-10-08",
+        status: "TURNO_OTRA_PERSONA",
+        period: "AM + PM",
+        anesthesiologist: "Patricia",
+      },
+    ]
+    const rates = [
+      { effectiveFrom: "1900-01-01", amount: 685_000 },
+      { effectiveFrom: "2026-10-08", amount: 700_000 },
+    ]
+
+    expect(getCoveredShiftSummary(coveredEntries, new Date("2026-10-01T12:00:00"), rates)).toEqual({
+      rows: [{ anesthesiologist: "Patricia", jornadas: 4, totalCop: 2_770_000 }],
+      totalJornadas: 4,
+      totalCop: 2_770_000,
+    })
   })
 
   it("shows LIBRE only for missing AM/PM slots without another record that day", () => {

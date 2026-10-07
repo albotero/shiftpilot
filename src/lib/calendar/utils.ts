@@ -140,6 +140,11 @@ export function isSomaWorkStatus(status: CalendarEntry["status"]) {
   return (
     status === "TURNO" ||
     status === "NOCHE" ||
+    status === "R1" ||
+    status === "R2" ||
+    status === "R3" ||
+    status === "R4" ||
+    status === "R5" ||
     status === "TURNO_DE_OTRA_PERSONA" ||
     status === "EXTERNO" ||
     status === "EXTERNO_NOCHE"

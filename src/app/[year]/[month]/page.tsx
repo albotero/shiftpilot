@@ -201,7 +201,7 @@ export default async function SharedMonthPage({ params }: PageProps) {
               <i className="legend-swatch shift" /> Turno
             </span>
             <span>
-              <i className="legend-swatch reservation" /> Reserva R1–R5
+              <i className="legend-swatch reservation-range" /> Turnos R1–R5
             </span>
             <span>
               <i className="legend-swatch other-shift" /> Te cubren
