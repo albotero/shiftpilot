@@ -2071,6 +2071,21 @@ a {
   text-transform: capitalize;
 }
 
+.debt-card-date-month {
+  font-weight: 400;
+}
+
+.debt-card-installment {
+  font-weight: 600;
+}
+
+.debt-card-next-installment {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+}
+
 .debt-card-row-value {
   color: #263c36;
   font-size: 14px;

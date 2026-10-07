@@ -11,6 +11,7 @@ import { addMoney } from "@/lib/money/integer"
 type DebtLedger = {
   summary: { balanceAmount: number }
   nextInstallment: {
+    installment: number
     dueDate: string
     amount: number
     parkingAmount: number
@@ -80,12 +81,17 @@ export function DebtSummaryCard({ showDetailsLink = false }: { showDetailsLink?:
         <div className="debt-card-detail">
           <div className="debt-card-row">
             <div className="debt-card-row-label">
-              <span>Próxima transferencia</span>
-              <strong className="debt-card-date">
-                {nextInstallment
-                  ? format(new Date(`${nextInstallment.month}-01T12:00:00`), "MMMM yyyy", { locale: es })
-                  : "Plan completado"}
-              </strong>
+              <span>Próxima cuota</span>
+              {nextInstallment ? (
+                <span className="debt-card-date debt-card-next-installment">
+                  <strong className="debt-card-installment">Cuota {nextInstallment.installment}</strong>
+                  <span className="debt-card-date-month">
+                    {format(new Date(`${nextInstallment.month}-01T12:00:00`), "MMMM yyyy", { locale: es })}
+                  </span>
+                </span>
+              ) : (
+                <strong className="debt-card-date">Plan completado</strong>
+              )}
             </div>
             <strong className="debt-card-row-value">
               {nextInstallment ? `${formatAmount(nextInstallment.totalTransferAmount)} mil` : "0 mil"}

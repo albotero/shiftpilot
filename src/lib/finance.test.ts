@@ -339,6 +339,7 @@ describe("fixed debt schedule", () => {
     expect(getDebtPlanSnapshot("2026-10")).toEqual({
       balanceAtMonthStart: 560362,
       nextInstallment: {
+        installment: 30,
         month: "2026-10",
         amount: 12031,
         principalAmount: 8426,
