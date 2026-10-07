@@ -78,6 +78,7 @@ export function DebtPaymentsManager() {
     ledger && ledger.summary.principalTotal > 0
       ? Math.round((ledger.summary.principalPaid / ledger.summary.principalTotal) * 1000) / 10
       : 0
+  const hasUnpaidInstallments = Boolean(ledger?.unpaidInstallments.length)
 
   useEffect(() => {
     const controller = new AbortController()
@@ -90,7 +91,7 @@ export function DebtPaymentsManager() {
           setLedger(currentLedger)
           setParkingRateAmount(currentLedger.parkingRateAmount)
           setParkingAmount(String(currentLedger.parkingRateAmount))
-          setAmount(String(getInstallmentAmount(currentLedger, "1")))
+          setAmount(currentLedger.unpaidInstallments.length > 0 ? String(getInstallmentAmount(currentLedger, "1")) : "")
         }
       })
       .catch((loadError) => {
@@ -149,7 +150,7 @@ export function DebtPaymentsManager() {
       const updatedLedger = result as DebtLedger
       setLedger(updatedLedger)
       setParkingRateAmount(updatedLedger.parkingRateAmount)
-      setAmount("")
+      setAmount(updatedLedger.unpaidInstallments.length > 0 ? String(getInstallmentAmount(updatedLedger, "1")) : "")
       setInstallmentsCount("1")
       setParkingAmount(String(updatedLedger.parkingRateAmount))
       setNotes("")
@@ -177,7 +178,12 @@ export function DebtPaymentsManager() {
       })
       const result = await response.json()
       if (!response.ok) throw new Error(result.error ?? "No se pudo eliminar el pago.")
-      setLedger(result as DebtLedger)
+      const updatedLedger = result as DebtLedger
+      setLedger(updatedLedger)
+      setInstallmentsCount("1")
+      setAmount(updatedLedger.unpaidInstallments.length > 0 ? String(getInstallmentAmount(updatedLedger, "1")) : "")
+      setParkingRateAmount(updatedLedger.parkingRateAmount)
+      setParkingAmount(String(updatedLedger.parkingRateAmount))
       setMessage("Pago eliminado y asignaciones recalculadas.")
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : "No se pudo eliminar el pago.")
@@ -195,66 +201,75 @@ export function DebtPaymentsManager() {
         </div>
       </div>
 
-      <form className="debt-payment-form" onSubmit={savePayment}>
-        <label className="form-field">
-          <span>Fecha del pago</span>
-          <input
-            id="debt-payment-date"
-            aria-label="Fecha del pago"
-            type="date"
-            value={paidAt}
-            onChange={(event) => void selectPaidAt(event.target.value)}
-            required
-          />
-        </label>
-        <label className="form-field">
-          <span>Cuotas a cubrir</span>
-          <select
-            value={installmentsCount}
-            disabled={!ledger || ledger.unpaidInstallments.length === 0}
-            onChange={(event) => selectInstallments(event.target.value)}
-          >
-            <option value="1">1 cuota</option>
-            <option value="2" disabled={!ledger || ledger.unpaidInstallments.length < 2}>
-              2 cuotas
-            </option>
-          </select>
-        </label>
-        <label className="form-field">
-          <span>Abono a deuda · miles COP</span>
-          <input
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="0.001"
-            required
-            value={amount}
-            onChange={(event) => setAmount(event.target.value)}
-          />
-        </label>
-        <label className="form-field">
-          <span>Parqueadero · miles COP</span>
-          <input
-            type="number"
-            inputMode="decimal"
-            min="0"
-            step="0.001"
-            value={parkingAmount}
-            onChange={(event) => setParkingAmount(event.target.value)}
-          />
-        </label>
-        <label className="form-field">
-          <span>Notas · opcional</span>
-          <input maxLength={500} value={notes} onChange={(event) => setNotes(event.target.value)} />
-        </label>
-        <button type="submit" className="submit-button debt-payment-submit" disabled={saving || parkingRateLoading}>
-          {saving ? "Guardando…" : "Registrar pago"}
-        </button>
-      </form>
-      <p className="debt-payment-rule">
-        FIFO: se cubren las cuotas pendientes más antiguas, interés y luego capital. Puedes registrar dos cuotas juntas;
-        no se agrega interés de mora y el parqueadero se suma por cuota.
-      </p>
+      {hasUnpaidInstallments && (
+        <>
+          <form className="debt-payment-form" onSubmit={savePayment}>
+            <label className="form-field">
+              <span>Fecha del pago</span>
+              <input
+                id="debt-payment-date"
+                aria-label="Fecha del pago"
+                type="date"
+                value={paidAt}
+                onChange={(event) => void selectPaidAt(event.target.value)}
+                required
+              />
+            </label>
+            <label className="form-field">
+              <span>Cuotas a cubrir</span>
+              <select
+                value={installmentsCount}
+                disabled={!ledger || ledger.unpaidInstallments.length === 0}
+                onChange={(event) => selectInstallments(event.target.value)}
+              >
+                <option value="1">1 cuota</option>
+                <option value="2" disabled={!ledger || ledger.unpaidInstallments.length < 2}>
+                  2 cuotas
+                </option>
+              </select>
+            </label>
+            <label className="form-field">
+              <span>Abono a deuda · miles COP</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.001"
+                required
+                value={amount}
+                onChange={(event) => setAmount(event.target.value)}
+              />
+            </label>
+            <label className="form-field">
+              <span>Parqueadero · miles COP</span>
+              <input
+                type="number"
+                inputMode="decimal"
+                min="0"
+                step="0.001"
+                value={parkingAmount}
+                onChange={(event) => setParkingAmount(event.target.value)}
+              />
+            </label>
+            <label className="form-field">
+              <span>Notas · opcional</span>
+              <input maxLength={500} value={notes} onChange={(event) => setNotes(event.target.value)} />
+            </label>
+            <button type="submit" className="submit-button debt-payment-submit" disabled={saving || parkingRateLoading}>
+              {saving ? "Guardando…" : "Registrar pago"}
+            </button>
+          </form>
+          <p className="debt-payment-rule">
+            FIFO: se cubren las cuotas pendientes más antiguas, interés y luego capital. Puedes registrar dos cuotas
+            juntas; no se agrega interés de mora y el parqueadero se suma por cuota.
+          </p>
+        </>
+      )}
+      {!loading && ledger && !hasUnpaidInstallments && (
+        <p className="debt-payment-rule" role="status">
+          No quedan cuotas pendientes para registrar.
+        </p>
+      )}
 
       {error && (
         <p className="form-error" role="alert">
@@ -345,10 +360,11 @@ export function DebtPaymentsManager() {
                           </div>
                           <span>
                             Interés {formatAmount(allocation.interestAmount)} · Capital{" "}
-                            {formatAmount(allocation.principalAmount)}
-                            {` · Saldo a capital ${formatAmount(allocation.balanceAfterAmount)} mil`}
-                            {allocation.unclassifiedAmount > 0 &&
-                              ` · Sin clasificar ${formatAmount(allocation.unclassifiedAmount)}`}
+                            {formatAmount(allocation.principalAmount)} · Saldo a capital{" "}
+                            {formatAmount(allocation.balanceAfterAmount)}
+                            {Number.isFinite(allocation.unclassifiedAmount) &&
+                              allocation.unclassifiedAmount > 0 &&
+                              ` · Sin clasificar ${formatAmount(allocation.unclassifiedAmount)} mil`}
                           </span>
                         </li>
                       ))}
