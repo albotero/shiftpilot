@@ -3663,7 +3663,10 @@ a {
     max-width: var(--desktop-settings-width);
   }
 
-  .coverage-summary-table,
+  .coverage-summary-table {
+    max-width: 480px;
+  }
+
   .coverage-rate-history {
     max-width: var(--desktop-form-width);
   }
