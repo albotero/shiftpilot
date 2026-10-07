@@ -278,7 +278,7 @@ export function DashboardOverview() {
               </div>
             )}
           </section>
-          <DebtSummaryCard />
+          <DebtSummaryCard showDetailsLink />
         </aside>
       </div>
     </>

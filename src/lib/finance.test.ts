@@ -5,7 +5,7 @@ import {
   calculatePrepaidInvoice,
   calculateSedarteInvoice,
 } from "@/lib/billing/calculations"
-import { calculateDebtSummary } from "@/lib/debt/calculations"
+import { calculateDebtSummary, calculatePaymentAllocationsByPayment } from "@/lib/debt/calculations"
 import { getDebtPlanSnapshot } from "@/lib/debt/plan-snapshot"
 import {
   calculateIbc,
@@ -187,6 +187,7 @@ describe("fixed debt schedule", () => {
     expect(result).toMatchObject({
       scheduledAmount: 2000,
       balanceAmount: 1500,
+      principalTotal: 1000,
       interestPaid: 100,
       principalPaid: 400,
       paymentsApplied: 500,
@@ -222,6 +223,40 @@ describe("fixed debt schedule", () => {
       paymentsApplied: 1.001,
       parkingPaid: 0.001,
     })
+  })
+
+  it("keeps each installment allocation linked to the real payment that funded it", () => {
+    expect(
+      calculatePaymentAllocationsByPayment(schedule, [
+        { id: "payment-first", paidAt: "2024-05-05", amount: 500, parkingAmount: 150 },
+        { id: "payment-second", paidAt: "2024-06-05", amount: 1000, parkingAmount: 0 },
+      ]),
+    ).toEqual([
+      {
+        paymentId: "payment-first",
+        installment: 1,
+        principalAmount: 400,
+        interestAmount: 100,
+        unclassifiedAmount: 0,
+        balanceAfterAmount: 600,
+      },
+      {
+        paymentId: "payment-second",
+        installment: 1,
+        principalAmount: 500,
+        interestAmount: 0,
+        unclassifiedAmount: 0,
+        balanceAfterAmount: 0,
+      },
+      {
+        paymentId: "payment-second",
+        installment: 2,
+        principalAmount: 420,
+        interestAmount: 80,
+        unclassifiedAmount: 0,
+        balanceAfterAmount: 0,
+      },
+    ])
   })
 
   it("preserves all 72 source installments and their stated amounts", () => {
@@ -266,6 +301,38 @@ describe("fixed debt schedule", () => {
       unclassifiedPaid: 1,
       scheduleDifference: 1,
     })
+  })
+
+  it("keeps the final row's unclassified amount on its payment allocation", () => {
+    const [month, previousBalance, monthlyInterest, paymentAmount, interestAmount, principalAmount, remainingBalance] =
+      initialDebtSchedule[71]
+
+    expect(
+      calculatePaymentAllocationsByPayment(
+        [
+          {
+            installment: 72,
+            dueDate: `${month}-01`,
+            previousBalance,
+            monthlyInterest,
+            paymentAmount,
+            interestAmount,
+            principalAmount,
+            remainingBalance,
+          },
+        ],
+        [{ id: "final-payment", paidAt: `${month}-11`, amount: paymentAmount, parkingAmount: 0 }],
+      ),
+    ).toEqual([
+      {
+        paymentId: "final-payment",
+        installment: 72,
+        principalAmount: 14_822,
+        interestAmount: 95,
+        unclassifiedAmount: 1,
+        balanceAfterAmount: 0,
+      },
+    ])
   })
 
   it("shows the balance before October 2026's planned installment", () => {

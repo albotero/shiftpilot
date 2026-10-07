@@ -359,6 +359,7 @@ model DebtPaymentAllocation {
   schedule           DebtSchedule @relation(fields: [scheduleId], references: [id], onDelete: Restrict)
   principalAmount    Decimal      @default(0) @db.Decimal(18, 3)
   interestAmount     Decimal      @default(0) @db.Decimal(18, 3)
+  unclassifiedAmount Decimal      @default(0) @db.Decimal(18, 3)
 
   @@unique([paymentId, scheduleId])
 }

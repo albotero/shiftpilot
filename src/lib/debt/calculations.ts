@@ -24,9 +24,13 @@ export type PaymentAllocation = {
   unclassifiedAmount: number
 }
 
+export type PaymentAllocationByPayment = PaymentAllocation & { paymentId: string; balanceAfterAmount: number }
+export type IdentifiedDebtPayment = DebtPayment & { id: string }
+
 export type DebtSummary = {
   scheduledAmount: number
   balanceAmount: number
+  principalTotal: number
   principalPaid: number
   interestPaid: number
   unclassifiedPaid: number
@@ -53,7 +57,10 @@ export function calculateDebtInterest(schedule: DebtScheduleLine[]) {
   return schedule.reduce((total, line) => total + line.monthlyInterest, 0)
 }
 
-export function calculatePaymentAllocation(schedule: DebtScheduleLine[], payments: DebtPayment[]): PaymentAllocation[] {
+export function calculatePaymentAllocationsByPayment(
+  schedule: DebtScheduleLine[],
+  payments: IdentifiedDebtPayment[],
+): PaymentAllocationByPayment[] {
   validateSchedule(schedule)
   const outstanding = schedule
     .slice()
@@ -64,12 +71,14 @@ export function calculatePaymentAllocation(schedule: DebtScheduleLine[], payment
       interestLeft: line.interestAmount,
       unclassifiedLeft: Math.max(0, subtractMoney(line.paymentAmount, line.principalAmount, line.interestAmount)),
     }))
-  const allocations: PaymentAllocation[] = []
+  const allocations: PaymentAllocationByPayment[] = []
+  let principalBalance = outstanding[0]?.previousBalance ?? 0
 
   for (const payment of payments.slice().sort((left, right) => left.paidAt.localeCompare(right.paidAt))) {
     assertMoneyAmount(payment.amount, "payment amount")
     assertMoneyAmount(payment.parkingAmount, "parkingAmount")
     let unapplied = payment.amount
+    const paymentAllocations: PaymentAllocation[] = []
 
     for (const line of outstanding) {
       if (unapplied === 0) break
@@ -86,12 +95,48 @@ export function calculatePaymentAllocation(schedule: DebtScheduleLine[], payment
       unapplied = subtractMoney(unapplied, unclassifiedAmount)
 
       if (addMoney(interestAmount, principalAmount, unclassifiedAmount) > 0) {
-        allocations.push({ installment: line.installment, principalAmount, interestAmount, unclassifiedAmount })
+        paymentAllocations.push({
+          installment: line.installment,
+          principalAmount,
+          interestAmount,
+          unclassifiedAmount,
+        })
       }
     }
+
+    const principalPaid = addMoney(...paymentAllocations.map((allocation) => allocation.principalAmount))
+    principalBalance = Math.max(0, subtractMoney(principalBalance, principalPaid))
+    allocations.push(
+      ...paymentAllocations.map((allocation) => ({
+        ...allocation,
+        paymentId: payment.id,
+        balanceAfterAmount: principalBalance,
+      })),
+    )
   }
 
   return allocations
+}
+
+export function calculatePaymentAllocation(schedule: DebtScheduleLine[], payments: DebtPayment[]): PaymentAllocation[] {
+  const allocationsByPayment = calculatePaymentAllocationsByPayment(
+    schedule,
+    payments.map((payment, index) => ({ ...payment, id: String(index) })),
+  )
+  const totalsByInstallment = new Map<number, PaymentAllocation>()
+  for (const allocation of allocationsByPayment) {
+    const total = totalsByInstallment.get(allocation.installment) ?? {
+      installment: allocation.installment,
+      principalAmount: 0,
+      interestAmount: 0,
+      unclassifiedAmount: 0,
+    }
+    total.principalAmount = addMoney(total.principalAmount, allocation.principalAmount)
+    total.interestAmount = addMoney(total.interestAmount, allocation.interestAmount)
+    total.unclassifiedAmount = addMoney(total.unclassifiedAmount, allocation.unclassifiedAmount)
+    totalsByInstallment.set(allocation.installment, total)
+  }
+  return Array.from(totalsByInstallment.values())
 }
 
 export function calculateDebtSummary(schedule: DebtScheduleLine[], payments: DebtPayment[], asOf: string): DebtSummary {
@@ -100,6 +145,11 @@ export function calculateDebtSummary(schedule: DebtScheduleLine[], payments: Deb
   const interestPaid = addMoney(...allocations.map((line) => line.interestAmount))
   const unclassifiedPaid = addMoney(...allocations.map((line) => line.unclassifiedAmount))
   const scheduledAmount = addMoney(...schedule.map((line) => line.paymentAmount))
+  const principalTotal =
+    schedule
+      .slice()
+      .sort((left, right) => left.dueDate.localeCompare(right.dueDate) || left.installment - right.installment)[0]
+      ?.previousBalance ?? 0
   const scheduleDifference = subtractMoney(
     addMoney(...schedule.map((line) => line.paymentAmount)),
     addMoney(...schedule.map((line) => line.interestAmount)),
@@ -125,6 +175,7 @@ export function calculateDebtSummary(schedule: DebtScheduleLine[], payments: Deb
   return {
     scheduledAmount,
     balanceAmount: Math.max(0, subtractMoney(scheduledAmount, paymentsApplied)),
+    principalTotal,
     principalPaid,
     interestPaid,
     unclassifiedPaid,

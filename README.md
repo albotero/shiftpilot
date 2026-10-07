@@ -174,8 +174,12 @@ Guarda las copias fuera del volumen del servidor, protégelas como datos privado
 
 Implementado: calendario mensual, semanal y agenda; turnos Soma, reservas, eventos, vacaciones y cobertura; persistencia vía PostgreSQL con fallback local; facturación end-to-end con CRUD, partidas, cálculos por tipo, vencimientos y resumen mensual; seguridad social mensual integrada con facturación, piso SMMLV consultado a MinTrabajo, tasas editables, redondeo por componente y persistencia idempotente; cálculos base de deuda y carga del plan original.
 
-Pendiente: pagos reales/asignación de deuda, reportes y auditoría final responsive/accesible. Seguridad social se recalcula con el CRUD de facturas y se persiste por mes.
+Pendiente: reportes y auditoría final responsive/accesible. Seguridad social se recalcula con el CRUD de facturas y se persiste por mes.
 
 ### Fase 9 — Seguridad social (CERRADA)
 
 Validado: IBC mensual sobre el neto final de facturas con piso igual al salario básico mínimo legal vigente (SMMLV), incluso cuando el neto mensual es cero; salud 12.5%, pensión 16%, ARL 2.436% y caja 1%, con redondeo independiente por componente. La API consulta la nota anual oficial de MinTrabajo en el primer uso de cada año y guarda el valor por año; si aún no se publica o falla la fuente, conserva el último valor verificado, lo marca como desactualizado y reintenta al día siguiente. Crear/editar/eliminar facturas recalcula sólo los meses afectados y el upsert no duplica períodos. Gates: lint, typecheck, 125 pruebas, build y Prisma validate; smoke CRUD productivo verificó el recálculo y limpió la factura temporal.
+
+### Fase 10 — Pagos reales y asignación de deuda (CERRADA)
+
+La página Deuda registra pagos reales, separa el parqueadero del abono a la deuda y muestra el saldo pendiente y el detalle asignado por pago. El total sugerido de transferencia usa el saldo restante de la cuota pendiente más antigua, aunque esté atrasada, más la tarifa de parqueadero vigente. El formulario permite preconfigurar una o dos cuotas en un pago, y FIFO las distribuye por antigüedad, primero interés y luego capital; cualquier diferencia de origen se conserva como no clasificada y no se añade interés de mora. Al borrar un pago se recalculan las asignaciones restantes. El dashboard muestra el saldo, la próxima transferencia y la última transferencia reales cuando la API está disponible. Gates: suite completa, lint, typecheck, build y Prisma validate.
