@@ -4,6 +4,8 @@ Las vacaciones se agregan como bloques manuales de una o más semanas completas 
 
 ShiftPilot es una aplicación personal para organizar turnos, eventos y finanzas. Esta guía está escrita para quien quiera crear y mantener su propia bifurcación (fork), usar sus propios datos y desplegar una instancia independiente.
 
+La creación de registros se realiza desde la página Calendario. El Resumen muestra la actividad y enlaces de consulta, sin botones para agregar eventos.
+
 ## Antes de usar el fork
 
 El proyecto no tiene autenticación y está pensado para una sola persona en un entorno local o privado. No publiques el puerto de la aplicación en Internet sin añadir una capa de acceso segura.

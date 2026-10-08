@@ -13,7 +13,6 @@ import {
   CircleDollarSign,
   Clock3,
   ShieldCheck,
-  Plus,
 } from "lucide-react"
 import { DebtSummaryCard } from "@/components/debt/DebtSummaryCard"
 import { PageHeading } from "@/components/dashboard/PageHeading"
@@ -91,11 +90,6 @@ export function DashboardOverview() {
           </>
         }
         description="Turnos, compromisos y cuentas en un solo lugar."
-        action={
-          <Link className="primary-quick-add" href="/calendar?new=1">
-            <Plus size={17} /> Nuevo registro
-          </Link>
-        }
       />
 
       <section className="stats-grid" aria-label="Resumen del mes">
@@ -268,9 +262,6 @@ export function DashboardOverview() {
                   <CalendarDays size={18} />
                 </span>
                 <p>Tu agenda está despejada.</p>
-                <Link href="/calendar?new=1">
-                  Agregar actividad <ArrowUpRight size={13} />
-                </Link>
               </div>
             )}
           </section>
