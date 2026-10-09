@@ -1,6 +1,7 @@
 import type { CalendarView } from "@/lib/calendar/types"
 import { CalendarWorkspace } from "@/components/calendar/CalendarWorkspace"
 import { PageHeading } from "@/components/dashboard/PageHeading"
+import { normalizeShareBaseUrl } from "@/lib/calendar/share-url"
 
 type SearchParams = {
   date?: string | string[]
@@ -35,6 +36,7 @@ export default async function CalendarPage({ searchParams }: { searchParams: Pro
         initialDate={validDateKey(firstValue(params.date))}
         initialView={initialView}
         openNew={firstValue(params.new) === "1"}
+        shareBaseUrl={normalizeShareBaseUrl(process.env.SHIFTPILOT_SHARE_URL)}
       />
     </>
   )

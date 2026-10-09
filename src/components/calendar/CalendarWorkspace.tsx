@@ -27,10 +27,12 @@ export function CalendarWorkspace({
   initialDate,
   initialView,
   openNew,
+  shareBaseUrl,
 }: {
   initialDate: string | null
   initialView: CalendarView
   openNew: boolean
+  shareBaseUrl: string | null
 }) {
   const entries = useSyncExternalStore(subscribeToCalendar, getCalendarEntries, getServerCalendarSnapshot)
   const [activeDate, setActiveDate] = useState(() => (initialDate ? new Date(`${initialDate}T12:00:00`) : new Date()))
@@ -137,6 +139,7 @@ export function CalendarWorkspace({
         onAdd={startNewEntry}
         onEdit={startEditingEntry}
         onFiltersChange={setFilters}
+        shareBaseUrl={shareBaseUrl}
       />
       <CoveredShiftSummary entries={allEntries} month={activeDate} />
       {dialogDate && (

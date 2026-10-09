@@ -1,11 +1,11 @@
 "use client"
 
-import { useState } from "react"
+import { useState, type MouseEvent } from "react"
 import { addDays, addMonths, eachDayOfInterval, format, isSameMonth, isToday, subMonths } from "date-fns"
-import Link from "next/link"
 import { ArrowLeft, ArrowRight, CalendarDays, ChevronDown, FileText, Plus, Share2 } from "lucide-react"
 import { es } from "date-fns/locale"
 import { getColombianHoliday } from "@/lib/calendar/colombian-holidays"
+import { getSharedMonthUrl } from "@/lib/calendar/share-url"
 import {
   formatLongDate,
   getCalendarEntryStartMinute,
@@ -27,11 +27,23 @@ type CalendarPanelProps = {
   onAdd: (date: Date) => void
   onEdit: (entry: CalendarEntry) => void
   onFiltersChange: (filters: EntryFilters) => void
+  shareBaseUrl: string | null
 }
 
 const weekdays = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
 const filterOrder: CalendarEntryKind[] = ["SOMA", "SEDARTE", "PERSONAL", "VACACIONES"]
 type AgendaItem = { date: string; entry: CalendarEntry } | { date: string; holiday: string }
+
+// Phones get the native share sheet; desktop keeps opening the shared month in a new tab.
+function shareMonth(event: MouseEvent<HTMLAnchorElement>, title: string) {
+  const url = event.currentTarget.href
+  if (typeof navigator.share !== "function" || !window.matchMedia("(pointer: coarse)").matches) return
+  event.preventDefault()
+  navigator.share({ title, url }).catch((error: unknown) => {
+    if (error instanceof DOMException && error.name === "AbortError") return
+    window.open(url, "_blank", "noreferrer")
+  })
+}
 
 export function CalendarPanel({
   entries,
@@ -43,6 +55,7 @@ export function CalendarPanel({
   onAdd,
   onEdit,
   onFiltersChange,
+  shareBaseUrl,
 }: CalendarPanelProps) {
   const [expandedDate, setExpandedDate] = useState<string | null>(null)
   const visibleDays = getVisibleDays(activeDate, view)
@@ -116,17 +129,18 @@ export function CalendarPanel({
               <ArrowRight size={16} />
             </button>
           </div>
-          <Link
+          <a
             className="calendar-share-button"
-            href={`/${format(activeDate, "yyyy")}/${format(activeDate, "MM")}`}
+            href={getSharedMonthUrl(activeDate, shareBaseUrl)}
             target="_blank"
             rel="noreferrer"
             aria-label="Compartir calendario"
             title="Compartir calendario"
+            onClick={(event) => shareMonth(event, `Calendario ${format(activeDate, "MMMM yyyy", { locale: es })}`)}
           >
             <Share2 size={15} />
             <span>Compartir</span>
-          </Link>
+          </a>
           <button className="add-entry-button" onClick={() => onAdd(activeDate)}>
             <Plus size={16} /> <span>Agregar</span>
           </button>

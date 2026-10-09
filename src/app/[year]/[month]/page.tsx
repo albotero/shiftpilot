@@ -1,4 +1,5 @@
 import Link from "next/link"
+import { headers } from "next/headers"
 import { notFound } from "next/navigation"
 import { addMonths, format, isSameMonth, isToday, subMonths } from "date-fns"
 import { es } from "date-fns/locale"
@@ -13,6 +14,7 @@ import {
   toDateKey,
 } from "@/lib/calendar/utils"
 import { expandWeeklyRecurrence } from "@/lib/calendar/recurrence"
+import { normalizeShareBaseUrl } from "@/lib/calendar/share-url"
 import type { CalendarEntry, ShiftPeriod } from "@/lib/calendar/types"
 import { prisma } from "@/server/db"
 
@@ -65,6 +67,11 @@ export default async function SharedMonthPage({ params }: PageProps) {
   const year = Number(yearText)
   const month = Number(monthText)
   if (year < 1900 || year > 9998 || month < 1 || month > 12) notFound()
+
+  const shareBaseUrl = normalizeShareBaseUrl(process.env.SHIFTPILOT_SHARE_URL)
+  const requestHost = (await headers()).get("host")
+  // The public tunnel only exposes month pages, so the app home link would be a dead end there.
+  const isPublicShare = Boolean(shareBaseUrl && requestHost && new URL(shareBaseUrl).host === requestHost)
 
   const monthDate = new Date(year, month - 1, 1, 12)
   const visibleDays = getVisibleDays(monthDate, "month")
@@ -163,12 +170,21 @@ export default async function SharedMonthPage({ params }: PageProps) {
     <main className="shared-calendar-page">
       <div className="shared-calendar-content">
         <header className="shared-calendar-header">
-          <Link className="shared-calendar-home" href="/" aria-label="Volver a ShiftPilot">
-            <span className="shared-calendar-mark">
-              <LayoutDashboard size={17} />
+          {isPublicShare ? (
+            <span className="shared-calendar-home">
+              <span className="shared-calendar-mark">
+                <LayoutDashboard size={17} />
+              </span>
+              <span>ShiftPilot</span>
             </span>
-            <span>ShiftPilot</span>
-          </Link>
+          ) : (
+            <Link className="shared-calendar-home" href="/" aria-label="Volver a ShiftPilot">
+              <span className="shared-calendar-mark">
+                <LayoutDashboard size={17} />
+              </span>
+              <span>ShiftPilot</span>
+            </Link>
+          )}
           <nav className="shared-month-navigation" aria-label="Navegación mensual">
             {year === 1900 && month === 1 ? (
               <span className="shared-month-arrow disabled" aria-hidden="true">

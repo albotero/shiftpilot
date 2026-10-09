@@ -191,6 +191,32 @@ docker compose run --rm --no-deps app npm run db:seed
 
 La aplicación no tiene login, roles ni control de acceso. Mantén el servicio en loopback o en una red privada. Si necesitas publicarlo, añade primero autenticación y HTTPS mediante una arquitectura de acceso que controles; no publiques PostgreSQL.
 
+### Compartir el calendario fuera de la red local
+
+El botón **Compartir** abre la vista mensual `/AAAA/MM`. Para que el enlace apunte a un dominio público, define en `.env` el origen que publicará esa vista y recrea `app`:
+
+```bash
+SHIFTPILOT_SHARE_URL=https://calendario.example.com
+docker compose up -d --no-deps --force-recreate app
+```
+
+Si la variable está vacía, el enlace usa la misma dirección desde la que abriste la aplicación. En el dominio público, el logo de la vista compartida no enlaza al resumen.
+
+Publica ese hostname solo para las rutas de meses y sus recursos estáticos, por ejemplo con Cloudflare Tunnel:
+
+```yaml
+ingress:
+  - hostname: calendario.example.com
+    path: "^/[0-9]{4}/[0-9]{2}/?$"
+    service: http://IP-PRIVADA:3000
+  - hostname: calendario.example.com
+    path: "^/(_next/static/.*|favicon\\.ico)$"
+    service: http://IP-PRIVADA:3000
+  - service: http_status:404
+```
+
+No agregues una regla sin `path` para ese hostname: publicaría el resto de la aplicación y sus APIs. Cualquiera con el enlace puede ver todos los meses, incluidas las notas y ubicaciones de los eventos; usa Cloudflare Access si necesitas limitar quién entra.
+
 ## Copias de seguridad
 
 Con Compose activo, crea una copia en formato custom usando las credenciales del servicio de base. Estos comandos están pensados para Bash; el archivo queda privado y sólo recibe su nombre definitivo si `pg_dump` termina correctamente:
