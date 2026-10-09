@@ -215,7 +215,7 @@ ingress:
   - service: http_status:404
 ```
 
-No agregues una regla sin `path` para ese hostname: publicaría el resto de la aplicación y sus APIs. Cualquiera con el enlace puede ver todos los meses, incluidas las notas y ubicaciones de los eventos; usa Cloudflare Access si necesitas limitar quién entra.
+No agregues una regla sin `path` para ese hostname: publicaría el resto de la aplicación y sus APIs. Cualquiera con el enlace puede ver todos los meses; usa Cloudflare Access si necesitas limitar quién entra. La vista compartida omite notas y ubicaciones, y muestra las sedaciones como «Sedación» con su hora y duración.
 
 ## Copias de seguridad
 

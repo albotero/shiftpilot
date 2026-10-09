@@ -15,6 +15,7 @@ import {
 } from "@/lib/calendar/utils"
 import { expandWeeklyRecurrence } from "@/lib/calendar/recurrence"
 import { normalizeShareBaseUrl } from "@/lib/calendar/share-url"
+import { toSharedCalendarEntry } from "@/lib/calendar/shared-entry"
 import type { CalendarEntry, ShiftPeriod } from "@/lib/calendar/types"
 import { prisma } from "@/server/db"
 
@@ -113,8 +114,6 @@ export default async function SharedMonthPage({ params }: PageProps) {
       title: event.title,
       ...(event.startTime ? { startTime: event.startTime } : {}),
       ...(event.durationMinutes !== null ? { durationHours: event.durationMinutes / 60 } : {}),
-      ...(event.location ? { location: event.location } : {}),
-      ...(event.notes ? { notes: event.notes } : {}),
     })),
     ...vacations.map((vacation) => ({
       id: vacation.id,
@@ -123,7 +122,6 @@ export default async function SharedMonthPage({ params }: PageProps) {
       ...(vacation.annualPlanYear ? { annualPlanYear: vacation.annualPlanYear } : {}),
       kind: "VACACIONES" as const,
       title: "VACACIONES",
-      ...(vacation.notes ? { notes: vacation.notes } : {}),
     })),
     ...recurrences.flatMap((rule) =>
       expandWeeklyRecurrence(
@@ -144,8 +142,6 @@ export default async function SharedMonthPage({ params }: PageProps) {
           ...(rule.period ? { period: rule.period } : {}),
           ...(rule.startTime ? { startTime: rule.startTime } : {}),
           ...(rule.durationMinutes ? { durationMinutes: rule.durationMinutes } : {}),
-          ...(rule.location ? { location: rule.location } : {}),
-          ...(rule.notes ? { notes: rule.notes } : {}),
         },
         dateKey(visibleDays[0]),
         dateKey(visibleDays[visibleDays.length - 1]),
@@ -156,12 +152,10 @@ export default async function SharedMonthPage({ params }: PageProps) {
           period: exception.period,
           startTime: exception.startTime,
           durationMinutes: exception.durationMinutes,
-          location: exception.location,
-          notes: exception.notes,
         })),
       ),
     ),
-  ]
+  ].map(toSharedCalendarEntry)
 
   const previousMonth = subMonths(monthDate, 1)
   const nextMonth = addMonths(monthDate, 1)
@@ -265,8 +259,6 @@ export default async function SharedMonthPage({ params }: PageProps) {
                           entry.startTime
                             ? `${entry.startTime}${entry.durationHours ? ` · ${entry.durationHours} h` : ""}`
                             : "",
-                          entry.location,
-                          entry.notes,
                         ].filter(Boolean)
                         return (
                           <div className="shared-entry" key={entry.id}>
