@@ -23,6 +23,7 @@ import {
   getEntryTone,
   getMonthShiftHours,
   getMonthSomaShiftCount,
+  isUpcomingCalendarEntry,
 } from "@/lib/calendar/utils"
 import { getCalendarEntries, getServerCalendarSnapshot, subscribeToCalendar } from "@/lib/calendar/storage"
 
@@ -36,6 +37,7 @@ function formatAmount(amount: number) {
 export function DashboardOverview() {
   const entries = useSyncExternalStore(subscribeToCalendar, getCalendarEntries, getServerCalendarSnapshot)
   const [activeDate] = useState(() => new Date())
+  const now = new Date()
   const [invoiceSummary, setInvoiceSummary] = useState<InvoiceSummary>({ count: 0, netAmount: 0 })
   const [socialSecurity, setSocialSecurity] = useState<SocialSecuritySummary | null>(null)
   const activeMonth = format(activeDate, "yyyy-MM")
@@ -43,7 +45,8 @@ export function DashboardOverview() {
   const shiftCount = getMonthSomaShiftCount(monthEntries, activeDate)
   const eventCount = monthEntries.filter((entry) => entry.kind === "SEDARTE" || entry.kind === "PERSONAL").length
   const shiftHours = getMonthShiftHours(entries, activeDate)
-  const todayKey = format(activeDate, "yyyy-MM-dd")
+  const todayKey = format(now, "yyyy-MM-dd")
+  const currentMinute = now.getHours() * 60 + now.getMinutes()
   const todayEntries = entries.filter((entry) => entry.date === todayKey)
   const todaySomaEntries = todayEntries.filter((entry) => entry.kind === "SOMA")
   const todayShiftCount = getMonthSomaShiftCount(todaySomaEntries, activeDate)
@@ -52,9 +55,9 @@ export function DashboardOverview() {
   const scheduleConflicts = findScheduleConflicts(entries, somaShiftWindows)
   const entriesById = new Map(entries.map((entry) => [entry.id, entry]))
   const upcomingEntries = entries
-    .filter((entry) => entry.date >= todayKey)
+    .filter((entry) => isUpcomingCalendarEntry(entry, todayKey, currentMinute))
     .sort((left, right) => left.date.localeCompare(right.date))
-    .slice(0, 4)
+    .slice(0, 6)
 
   useEffect(() => {
     const controller = new AbortController()

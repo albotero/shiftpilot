@@ -43,6 +43,14 @@ export function getCalendarEntryStartMinute(entry: CalendarEntry) {
   return entry.startTime ? timeToMinutes(entry.startTime) : 0
 }
 
+export function isUpcomingCalendarEntry(entry: CalendarEntry, today: string, currentMinute: number) {
+  if (entry.date > today) return true
+  if (entry.date < today) return false
+
+  const hasStartTime = entry.kind === "SOMA" ? Boolean(entry.period || entry.startTime) : Boolean(entry.startTime)
+  return !hasStartTime || getCalendarEntryStartMinute(entry) > currentMinute
+}
+
 export function getEntriesForDate(entries: CalendarEntry[], date: Date, includeFreeSomaFallback = true) {
   const key = toDateKey(date)
   const matching = entries.filter((entry) => {
