@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { isUpcomingCalendarEntry } from "@/lib/calendar/utils"
+import { compareCalendarEntriesByStart, isUpcomingCalendarEntry } from "@/lib/calendar/utils"
 import type { CalendarEntry } from "@/lib/calendar/types"
 
 const today = "2026-10-09"
@@ -39,5 +39,24 @@ describe("isUpcomingCalendarEntry", () => {
 
     expect(isUpcomingCalendarEntry(morningShift, today, 6 * 60 + 59)).toBe(true)
     expect(isUpcomingCalendarEntry(morningShift, today, 7 * 60)).toBe(false)
+  })
+})
+
+describe("compareCalendarEntriesByStart", () => {
+  it("orders by date and then by start time", () => {
+    const entries: CalendarEntry[] = [
+      { ...event, id: "tomorrow-early", date: "2026-10-10", startTime: "06:00" },
+      { ...event, id: "late", startTime: "18:00" },
+      { id: "pm-shift", date: today, kind: "SOMA", title: "TURNO", period: "PM" },
+      { ...event, id: "early", startTime: "08:15" },
+      { ...event, id: "all-day", startTime: undefined },
+    ]
+    expect(entries.sort(compareCalendarEntriesByStart).map((entry) => entry.id)).toEqual([
+      "all-day",
+      "early",
+      "pm-shift",
+      "late",
+      "tomorrow-early",
+    ])
   })
 })

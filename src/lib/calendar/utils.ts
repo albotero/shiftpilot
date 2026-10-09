@@ -43,6 +43,10 @@ export function getCalendarEntryStartMinute(entry: CalendarEntry) {
   return entry.startTime ? timeToMinutes(entry.startTime) : 0
 }
 
+export function compareCalendarEntriesByStart(left: CalendarEntry, right: CalendarEntry) {
+  return left.date.localeCompare(right.date) || getCalendarEntryStartMinute(left) - getCalendarEntryStartMinute(right)
+}
+
 export function isUpcomingCalendarEntry(entry: CalendarEntry, today: string, currentMinute: number) {
   if (entry.date > today) return true
   if (entry.date < today) return false

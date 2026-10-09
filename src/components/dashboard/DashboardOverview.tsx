@@ -23,6 +23,7 @@ import {
   getEntryTone,
   getMonthShiftHours,
   getMonthSomaShiftCount,
+  compareCalendarEntriesByStart,
   isUpcomingCalendarEntry,
 } from "@/lib/calendar/utils"
 import { getCalendarEntries, getServerCalendarSnapshot, subscribeToCalendar } from "@/lib/calendar/storage"
@@ -56,7 +57,7 @@ export function DashboardOverview() {
   const entriesById = new Map(entries.map((entry) => [entry.id, entry]))
   const upcomingEntries = entries
     .filter((entry) => isUpcomingCalendarEntry(entry, todayKey, currentMinute))
-    .sort((left, right) => left.date.localeCompare(right.date))
+    .sort(compareCalendarEntriesByStart)
     .slice(0, 6)
 
   useEffect(() => {
