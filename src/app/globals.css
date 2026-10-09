@@ -3544,12 +3544,6 @@ a {
   font-size: 10px;
 }
 
-.restore-button {
-  border-color: #c6ddd2;
-  background: #f2faf6;
-  color: #176b59;
-}
-
 .delete-confirmation {
   display: flex;
   flex-wrap: wrap;
@@ -3563,14 +3557,9 @@ a {
   font-size: 10px;
 }
 
-.restore-confirmation {
+.restore-confirmation .cancel-delete-button {
   border-color: #c6ddd2;
   background: #f2faf6;
-  color: #176b59;
-}
-
-.restore-confirmation .confirm-delete-button {
-  border-color: #c6ddd2;
   color: #176b59;
 }
 
