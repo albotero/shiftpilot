@@ -14,7 +14,7 @@ import {
   toDateKey,
 } from "@/lib/calendar/utils"
 import { expandWeeklyRecurrence } from "@/lib/calendar/recurrence"
-import { normalizeShareBaseUrl } from "@/lib/calendar/share-url"
+import { isPublicShareRequest } from "@/lib/calendar/shared-access"
 import { toSharedCalendarEntry } from "@/lib/calendar/shared-entry"
 import type { CalendarEntry, ShiftPeriod } from "@/lib/calendar/types"
 import { prisma } from "@/server/db"
@@ -69,10 +69,15 @@ export default async function SharedMonthPage({ params }: PageProps) {
   const month = Number(monthText)
   if (year < 1900 || year > 9998 || month < 1 || month > 12) notFound()
 
-  const shareBaseUrl = normalizeShareBaseUrl(process.env.SHIFTPILOT_SHARE_URL)
-  const requestHost = (await headers()).get("host")
+  const requestHeaders = await headers()
   // The public tunnel only exposes month pages, so the app home link would be a dead end there.
-  const isPublicShare = Boolean(shareBaseUrl && requestHost && new URL(shareBaseUrl).host === requestHost)
+  const isPublicShare = isPublicShareRequest({
+    method: "GET",
+    pathname: "",
+    host: requestHeaders.get("host"),
+    cloudflareRay: requestHeaders.get("cf-ray"),
+    shareBaseUrl: process.env.SHIFTPILOT_SHARE_URL,
+  })
 
   const monthDate = new Date(year, month - 1, 1, 12)
   const visibleDays = getVisibleDays(monthDate, "month")

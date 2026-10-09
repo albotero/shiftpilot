@@ -202,7 +202,7 @@ docker compose up -d --no-deps --force-recreate app
 
 Si la variable está vacía, el enlace usa la misma dirección desde la que abriste la aplicación. En el dominio público, el logo de la vista compartida no enlaza al resumen.
 
-Publica ese hostname solo para las rutas de meses y sus recursos estáticos, por ejemplo con Cloudflare Tunnel:
+Publica ese hostname con Cloudflare Tunnel. La aplicación detecta las peticiones del dominio público (o con cabecera `cf-ray`) y sólo responde las rutas de meses y sus recursos estáticos; cualquier otra ruta muestra la página 404 de ShiftPilot:
 
 ```yaml
 ingress:
@@ -212,10 +212,14 @@ ingress:
   - hostname: calendario.example.com
     path: "^/(_next/static/.*|favicon\\.ico)$"
     service: http://IP-PRIVADA:3000
+  # Rutas restantes: la aplicación responde con su página 404.
+  - hostname: calendario.example.com
+    path: ".*"
+    service: http://IP-PRIVADA:3000
   - service: http_status:404
 ```
 
-No agregues una regla sin `path` para ese hostname: publicaría el resto de la aplicación y sus APIs. Cualquiera con el enlace puede ver todos los meses; usa Cloudflare Access si necesitas limitar quién entra. La vista compartida omite notas y ubicaciones, y muestra las sedaciones como «Sedación» con su hora y duración.
+La tercera regla delega en la aplicación el bloqueo del resto de rutas; si prefieres que Cloudflare las corte sin pasar por ShiftPilot, omítela y verás la respuesta 404 vacía del túnel. Cualquiera con el enlace puede ver todos los meses; usa Cloudflare Access si necesitas limitar quién entra. La vista compartida omite notas y ubicaciones, y muestra las sedaciones como «Sedación» con su hora y duración.
 
 ## Copias de seguridad
 

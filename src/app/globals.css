@@ -778,6 +778,64 @@ a {
   background: var(--canvas);
 }
 
+.not-found-page {
+  display: grid;
+  min-height: 100vh;
+  place-items: center;
+  padding: 22px;
+  background: var(--canvas);
+}
+
+.not-found-card {
+  display: grid;
+  width: min(420px, 100%);
+  justify-items: center;
+  gap: 10px;
+  padding: 34px 26px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--paper);
+  color: #24332f;
+  text-align: center;
+}
+
+.not-found-code {
+  margin: 6px 0 0;
+  color: var(--forest);
+  font-size: 44px;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.not-found-card h1 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 650;
+}
+
+.not-found-card p:not(.not-found-code) {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+
+.not-found-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 10px 16px;
+  border-radius: 8px;
+  background: var(--forest);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.not-found-action:hover {
+  background: #1f5046;
+}
+
 .shared-calendar-content {
   width: min(1440px, 100%);
   margin: 0 auto;
