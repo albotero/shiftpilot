@@ -17,6 +17,8 @@ type PaymentAllocation = {
   unclassifiedAmount: number
   balanceAfterAmount: number
   totalBalanceAfterAmount: number
+  installmentAmount: number
+  installmentBalanceAfterAmount: number
 }
 
 type DebtPaymentRecord = {

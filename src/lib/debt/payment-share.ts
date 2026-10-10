@@ -1,5 +1,6 @@
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
+import { addMoney } from "@/lib/money/integer"
 
 export type SharedDebtPaymentAllocation = {
   installment: number
@@ -9,6 +10,8 @@ export type SharedDebtPaymentAllocation = {
   unclassifiedAmount: number
   balanceAfterAmount: number
   totalBalanceAfterAmount: number
+  installmentAmount: number
+  installmentBalanceAfterAmount: number
 }
 
 export type SharedDebtPayment = {
@@ -29,7 +32,7 @@ function formatDate(date: string, pattern: string) {
 }
 
 export function buildDebtPaymentShareText(payment: SharedDebtPayment) {
-  const total = Math.round((payment.amount + payment.parkingAmount) * 1000) / 1000
+  const total = addMoney(payment.amount, payment.parkingAmount)
   const lines = [
     `Total transferido: *${formatPesos(total)}*`,
     `• Abono a deuda: ${formatPesos(payment.amount)}`,
@@ -37,15 +40,36 @@ export function buildDebtPaymentShareText(payment: SharedDebtPayment) {
   ]
   if (payment.notes?.trim()) lines.push(`Notas: ${payment.notes.trim()}`)
 
+  const balance = payment.allocations[0]
+  if (balance) {
+    lines.push(
+      "",
+      "Saldos después del pago:",
+      `• Saldo a capital: ${formatPesos(balance.balanceAfterAmount)}`,
+      `• Saldo total (capital + intereses): ${formatPesos(balance.totalBalanceAfterAmount)}`,
+      "",
+      "────────────────────",
+    )
+  }
+
   for (const allocation of payment.allocations) {
+    const applied = addMoney(allocation.principalAmount, allocation.interestAmount, allocation.unclassifiedAmount)
+    const partial = applied < allocation.installmentAmount
     lines.push("", `*Cuota ${allocation.installment}* · ${formatDate(allocation.dueDate, "MMMM yyyy")}`)
-    lines.push(`• Interés: ${formatPesos(allocation.interestAmount)}`)
-    lines.push(`• Capital: ${formatPesos(allocation.principalAmount)}`)
+    lines.push(`• Capital${partial ? " abonado" : ""}: ${formatPesos(allocation.principalAmount)}`)
+    lines.push(`• Intereses${partial ? " abonados" : ""}: ${formatPesos(allocation.interestAmount)}`)
     if (Number.isFinite(allocation.unclassifiedAmount) && allocation.unclassifiedAmount > 0) {
       lines.push(`• Sin clasificar: ${formatPesos(allocation.unclassifiedAmount)}`)
     }
-    lines.push(`• Saldo a capital: ${formatPesos(allocation.balanceAfterAmount)}`)
-    lines.push(`• Saldo total: ${formatPesos(allocation.totalBalanceAfterAmount)}`)
+    lines.push(`• Total de la cuota: *${formatPesos(allocation.installmentAmount)}*`)
+    if (partial) lines.push(`• Abono en este pago: ${formatPesos(applied)}`)
+    lines.push(
+      `• Estado después del pago: ${
+        allocation.installmentBalanceAfterAmount === 0
+          ? "Cancelada"
+          : `Pendiente *${formatPesos(allocation.installmentBalanceAfterAmount)}*`
+      }`,
+    )
   }
 
   return lines.join("\n")

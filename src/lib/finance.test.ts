@@ -356,6 +356,8 @@ describe("fixed debt schedule", () => {
         unclassifiedAmount: 0,
         balanceAfterAmount: 600,
         totalBalanceAfterAmount: 1500,
+        installmentAmount: 1000,
+        installmentBalanceAfterAmount: 500,
       },
       {
         paymentId: "payment-second",
@@ -365,6 +367,8 @@ describe("fixed debt schedule", () => {
         unclassifiedAmount: 0,
         balanceAfterAmount: 0,
         totalBalanceAfterAmount: 500,
+        installmentAmount: 1000,
+        installmentBalanceAfterAmount: 0,
       },
       {
         paymentId: "payment-second",
@@ -374,6 +378,8 @@ describe("fixed debt schedule", () => {
         unclassifiedAmount: 0,
         balanceAfterAmount: 0,
         totalBalanceAfterAmount: 500,
+        installmentAmount: 1000,
+        installmentBalanceAfterAmount: 500,
       },
     ])
   })
@@ -451,6 +457,8 @@ describe("fixed debt schedule", () => {
         unclassifiedAmount: 1,
         balanceAfterAmount: 0,
         totalBalanceAfterAmount: 0,
+        installmentAmount: 14_918,
+        installmentBalanceAfterAmount: 0,
       },
     ])
   })

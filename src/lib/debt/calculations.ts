@@ -28,6 +28,8 @@ export type PaymentAllocationByPayment = PaymentAllocation & {
   paymentId: string
   balanceAfterAmount: number
   totalBalanceAfterAmount: number
+  installmentAmount: number
+  installmentBalanceAfterAmount: number
 }
 export type IdentifiedDebtPayment = DebtPayment & { id: string }
 
@@ -83,7 +85,10 @@ export function calculatePaymentAllocationsByPayment(
     assertMoneyAmount(payment.amount, "payment amount")
     assertMoneyAmount(payment.parkingAmount, "parkingAmount")
     let unapplied = payment.amount
-    const paymentAllocations: PaymentAllocation[] = []
+    const paymentAllocations: (PaymentAllocation & {
+      installmentAmount: number
+      installmentBalanceAfterAmount: number
+    })[] = []
 
     for (const line of outstanding) {
       if (unapplied === 0) break
@@ -105,6 +110,8 @@ export function calculatePaymentAllocationsByPayment(
           principalAmount,
           interestAmount,
           unclassifiedAmount,
+          installmentAmount: line.paymentAmount,
+          installmentBalanceAfterAmount: addMoney(line.principalLeft, line.interestLeft, line.unclassifiedLeft),
         })
       }
     }

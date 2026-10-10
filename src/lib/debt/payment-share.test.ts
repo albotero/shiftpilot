@@ -19,8 +19,10 @@ describe("debt payment share", () => {
           interestAmount: 400,
           principalAmount: 1100,
           unclassifiedAmount: 0,
-          balanceAfterAmount: 20000,
-          totalBalanceAfterAmount: 24000,
+          balanceAfterAmount: 18889.75,
+          totalBalanceAfterAmount: 21499.5,
+          installmentAmount: 1500,
+          installmentBalanceAfterAmount: 0,
         },
         {
           installment: 5,
@@ -30,6 +32,8 @@ describe("debt payment share", () => {
           unclassifiedAmount: 0.001,
           balanceAfterAmount: 18889.75,
           totalBalanceAfterAmount: 21499.5,
+          installmentAmount: 1500.501,
+          installmentBalanceAfterAmount: 0,
         },
       ],
     })
@@ -41,20 +45,53 @@ describe("debt payment share", () => {
         "• Parqueadero: $120.000",
         "Notas: Transferencia Bancolombia",
         "",
+        "Saldos después del pago:",
+        "• Saldo a capital: $18.889.750",
+        "• Saldo total (capital + intereses): $21.499.500",
+        "",
+        "────────────────────",
+        "",
         "*Cuota 4* · septiembre 2026",
-        "• Interés: $400.000",
         "• Capital: $1.100.000",
-        "• Saldo a capital: $20.000.000",
-        "• Saldo total: $24.000.000",
+        "• Intereses: $400.000",
+        "• Total de la cuota: *$1.500.000*",
+        "• Estado después del pago: Cancelada",
         "",
         "*Cuota 5* · octubre 2026",
-        "• Interés: $390.250",
         "• Capital: $1.110.250",
+        "• Intereses: $390.250",
         "• Sin clasificar: $1",
-        "• Saldo a capital: $18.889.750",
-        "• Saldo total: $21.499.500",
+        "• Total de la cuota: *$1.500.501*",
+        "• Estado después del pago: Cancelada",
       ].join("\n"),
     )
+  })
+
+  it.each([500, 0])("reports the historical installment balance after a partial contribution: %s", (remaining) => {
+    const text = buildDebtPaymentShareText({
+      amount: 500,
+      parkingAmount: 0,
+      notes: null,
+      allocations: [{
+        installment: 1,
+        dueDate: "2026-10-01",
+        principalAmount: 400,
+        interestAmount: 100,
+        unclassifiedAmount: 0,
+        balanceAfterAmount: 600,
+        totalBalanceAfterAmount: 1500,
+        installmentAmount: 1000,
+        installmentBalanceAfterAmount: remaining,
+      }],
+    })
+    expect(text).toContain("• Capital abonado: $400.000\n• Intereses abonados: $100.000")
+    expect(text).toContain("• Total de la cuota: *$1.000.000*\n• Abono en este pago: $500.000")
+    expect(text).toContain(
+      remaining === 0
+        ? "• Estado después del pago: Cancelada"
+        : "• Estado después del pago: Pendiente *$500.000*",
+    )
+    expect(text.match(/Saldo a capital:/g)).toHaveLength(1)
   })
 
   it("omits empty notes and installments when nothing was allocated", () => {
