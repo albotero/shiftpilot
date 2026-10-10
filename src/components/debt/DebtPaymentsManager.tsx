@@ -443,11 +443,6 @@ export function DebtPaymentsManager() {
                               )}
                             </span>
                           </div>
-                          {allocation.installmentBalanceAfterAmount > 0 && (
-                            <p className="debt-installment-pending-amount">
-                              Pendiente después del pago: <b>{formatAmount(allocation.installmentBalanceAfterAmount)} mil COP</b>
-                            </p>
-                          )}
                           <div className="debt-payment-allocation-details">
                             <span>Interés <b>{formatAmount(allocation.interestAmount)} mil</b></span>
                             <span>Capital <b>{formatAmount(allocation.principalAmount)} mil</b></span>
@@ -456,6 +451,11 @@ export function DebtPaymentsManager() {
                               allocation.unclassifiedAmount > 0 &&
                               <span>Sin clasificar <b>{formatAmount(allocation.unclassifiedAmount)} mil</b></span>}
                           </div>
+                          {allocation.installmentBalanceAfterAmount > 0 && (
+                            <p className="debt-installment-pending-amount">
+                              Pendiente después del pago: <b>{formatAmount(allocation.installmentBalanceAfterAmount)} mil COP</b>
+                            </p>
+                          )}
                         </li>
                       ))}
                     </ul>
