@@ -62,19 +62,6 @@ function getInstallmentAmount(ledger: DebtLedger, value: string) {
   return addMoney(...installments.map((installment) => installment.remainingAmount))
 }
 
-async function sharePayment(payment: DebtPaymentRecord) {
-  const text = buildDebtPaymentShareText(payment)
-  if (typeof navigator.share === "function") {
-    try {
-      await navigator.share({ text })
-      return
-    } catch (shareError) {
-      if (shareError instanceof DOMException && shareError.name === "AbortError") return
-    }
-  }
-  window.open(getWhatsAppShareUrl(text), "_blank", "noopener,noreferrer")
-}
-
 export function DebtPaymentsManager() {
   const [ledger, setLedger] = useState<DebtLedger | null>(null)
   const [paidAt, setPaidAt] = useState(() => format(new Date(), "yyyy-MM-dd"))
@@ -104,6 +91,21 @@ export function DebtPaymentsManager() {
     : 0
   const hasUnpaidInstallments = Boolean(ledger?.unpaidInstallments.length)
   const showPaymentForm = hasUnpaidInstallments || editingPaymentId !== null
+
+  async function sharePayment(payment: DebtPaymentRecord) {
+    const text = buildDebtPaymentShareText(payment)
+    setError("")
+    if (typeof navigator.share === "function") {
+      try {
+        await navigator.share({ text })
+        return
+      } catch (shareError) {
+        if (shareError instanceof DOMException && shareError.name === "AbortError") return
+        setError("No se pudo abrir el menú de compartir. Se intentará abrir WhatsApp.")
+      }
+    }
+    window.location.assign(getWhatsAppShareUrl(text))
+  }
 
   useEffect(() => {
     const controller = new AbortController()
@@ -429,14 +431,14 @@ export function DebtPaymentsManager() {
                             <strong>Cuota {allocation.installment}</strong>
                             <span>{formatPaymentMonth(allocation.dueDate)}</span>
                           </div>
-                          <span>
-                            Interés {formatAmount(allocation.interestAmount)} · Capital{" "}
-                            {formatAmount(allocation.principalAmount)} · Saldo a capital{" "}
-                            {formatAmount(allocation.balanceAfterAmount)}
+                          <div className="debt-payment-allocation-details">
+                            <span>Interés <b>{formatAmount(allocation.interestAmount)} mil</b></span>
+                            <span>Capital <b>{formatAmount(allocation.principalAmount)} mil</b></span>
+                            <span>Saldo a capital <b>{formatAmount(allocation.balanceAfterAmount)} mil</b></span>
                             {Number.isFinite(allocation.unclassifiedAmount) &&
                               allocation.unclassifiedAmount > 0 &&
-                              ` · Sin clasificar ${formatAmount(allocation.unclassifiedAmount)} mil`}
-                          </span>
+                              <span>Sin clasificar <b>{formatAmount(allocation.unclassifiedAmount)} mil</b></span>}
+                          </div>
                         </li>
                       ))}
                     </ul>

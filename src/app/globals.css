@@ -2288,11 +2288,13 @@ a {
 
 .debt-page-content {
   display: grid;
+  min-width: 0;
   gap: 14px;
 }
 
 .debt-payments-panel {
   display: grid;
+  min-width: 0;
   gap: 14px;
   padding: 17px;
   border: 1px solid #e3e8e1;
@@ -2413,7 +2415,6 @@ a {
   border-bottom: 0;
 }
 
-.debt-payment-record-heading,
 .debt-payment-record-totals {
   display: flex;
   align-items: center;
@@ -2421,7 +2422,14 @@ a {
   gap: 10px;
 }
 
-.debt-payment-record-heading > div {
+.debt-payment-record-heading {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 6px 12px;
+}
+
+.debt-payment-record-heading > div:not(.debt-payment-record-actions) {
   display: grid;
   min-width: 0;
   gap: 3px;
@@ -2448,8 +2456,12 @@ a {
 }
 
 .debt-payment-record-actions {
-  flex: 0 0 auto;
+  display: flex;
   gap: 5px;
+}
+
+.debt-payment-record-actions .icon-button {
+  flex: 0 0 auto;
 }
 
 .debt-payment-record-totals {
@@ -2471,7 +2483,7 @@ a {
 }
 
 .debt-payment-allocation-list {
-  gap: 4px;
+  gap: 8px;
   padding-left: 10px;
   border-left: 2px solid #e3e8e1;
 }
@@ -2480,7 +2492,26 @@ a {
   display: grid;
   gap: 3px;
   color: #758078;
-  font-size: 9px;
+  font-size: 11px;
+  line-height: 1.5;
+}
+
+.debt-payment-allocation-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 12px;
+}
+
+.debt-payment-allocation-details span {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.debt-payment-allocation-details b {
+  color: #536257;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
 }
 
 .debt-payment-allocation-heading {
@@ -2524,6 +2555,26 @@ a {
 
   .debt-payment-form-actions > button {
     width: 100%;
+  }
+
+  .debt-payment-record-heading {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .debt-payment-record-total {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .debt-payment-record-actions {
+    grid-column: 2;
+    grid-row: 1 / span 2;
+  }
+
+  .debt-payment-record-actions .icon-button {
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
   }
 }
 
