@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import { Pencil, Trash2 } from "lucide-react"
+import { Pencil, Share2, Trash2 } from "lucide-react"
 import { MoneyInput } from "@/components/forms/MoneyInput"
 import type { DebtSummary } from "@/lib/debt/calculations"
+import { buildDebtPaymentShareText, getWhatsAppShareUrl } from "@/lib/debt/payment-share"
 import { addMoney, subtractMoney } from "@/lib/money/integer"
 
 type PaymentAllocation = {
@@ -15,6 +16,7 @@ type PaymentAllocation = {
   interestAmount: number
   unclassifiedAmount: number
   balanceAfterAmount: number
+  totalBalanceAfterAmount: number
 }
 
 type DebtPaymentRecord = {
@@ -58,6 +60,19 @@ function formatPaymentMonth(date: string) {
 function getInstallmentAmount(ledger: DebtLedger, value: string) {
   const installments = ledger.unpaidInstallments.slice(0, Number(value))
   return addMoney(...installments.map((installment) => installment.remainingAmount))
+}
+
+async function sharePayment(payment: DebtPaymentRecord) {
+  const text = buildDebtPaymentShareText(payment)
+  if (typeof navigator.share === "function") {
+    try {
+      await navigator.share({ text })
+      return
+    } catch (shareError) {
+      if (shareError instanceof DOMException && shareError.name === "AbortError") return
+    }
+  }
+  window.open(getWhatsAppShareUrl(text), "_blank", "noopener,noreferrer")
 }
 
 export function DebtPaymentsManager() {
@@ -367,6 +382,15 @@ export function DebtPaymentsManager() {
                       {formatAmount(addMoney(payment.amount, payment.parkingAmount))} mil
                     </strong>
                     <div className="debt-payment-record-actions">
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label={`Compartir pago del ${formatPaymentDate(payment.paidAt)}`}
+                        title="Compartir pago"
+                        onClick={() => void sharePayment(payment)}
+                      >
+                        <Share2 size={14} />
+                      </button>
                       <button
                         type="button"
                         className="icon-button"

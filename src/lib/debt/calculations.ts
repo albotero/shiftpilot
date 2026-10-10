@@ -24,7 +24,11 @@ export type PaymentAllocation = {
   unclassifiedAmount: number
 }
 
-export type PaymentAllocationByPayment = PaymentAllocation & { paymentId: string; balanceAfterAmount: number }
+export type PaymentAllocationByPayment = PaymentAllocation & {
+  paymentId: string
+  balanceAfterAmount: number
+  totalBalanceAfterAmount: number
+}
 export type IdentifiedDebtPayment = DebtPayment & { id: string }
 
 export type DebtSummary = {
@@ -73,6 +77,7 @@ export function calculatePaymentAllocationsByPayment(
     }))
   const allocations: PaymentAllocationByPayment[] = []
   let principalBalance = outstanding[0]?.previousBalance ?? 0
+  let totalBalance = addMoney(...outstanding.map((line) => line.paymentAmount))
 
   for (const payment of payments.slice().sort((left, right) => left.paidAt.localeCompare(right.paidAt))) {
     assertMoneyAmount(payment.amount, "payment amount")
@@ -106,11 +111,18 @@ export function calculatePaymentAllocationsByPayment(
 
     const principalPaid = addMoney(...paymentAllocations.map((allocation) => allocation.principalAmount))
     principalBalance = Math.max(0, subtractMoney(principalBalance, principalPaid))
+    const appliedAmount = addMoney(
+      ...paymentAllocations.map((allocation) =>
+        addMoney(allocation.interestAmount, allocation.principalAmount, allocation.unclassifiedAmount),
+      ),
+    )
+    totalBalance = Math.max(0, subtractMoney(totalBalance, appliedAmount))
     allocations.push(
       ...paymentAllocations.map((allocation) => ({
         ...allocation,
         paymentId: payment.id,
         balanceAfterAmount: principalBalance,
+        totalBalanceAfterAmount: totalBalance,
       })),
     )
   }
