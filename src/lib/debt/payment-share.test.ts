@@ -9,6 +9,7 @@ describe("debt payment share", () => {
 
   it("includes payment data and every covered installment", () => {
     const text = buildDebtPaymentShareText({
+      paidAt: "2026-10-05",
       amount: 3000.5,
       parkingAmount: 120,
       notes: " Transferencia Bancolombia ",
@@ -40,6 +41,7 @@ describe("debt payment share", () => {
 
     expect(text).toBe(
       [
+        "Fecha de transferencia: 5 de octubre de 2026",
         "Total transferido: *$3.120.500*",
         "• Abono a deuda: $3.000.500",
         "• Parqueadero: $120.000",
@@ -69,6 +71,7 @@ describe("debt payment share", () => {
 
   it.each([500, 0])("reports the historical installment balance after a partial contribution: %s", (remaining) => {
     const text = buildDebtPaymentShareText({
+      paidAt: "2026-10-05",
       amount: 500,
       parkingAmount: 0,
       notes: null,
@@ -95,7 +98,7 @@ describe("debt payment share", () => {
   })
 
   it("omits empty notes and installments when nothing was allocated", () => {
-    const text = buildDebtPaymentShareText({ amount: 10, parkingAmount: 0, notes: null, allocations: [] })
+    const text = buildDebtPaymentShareText({ paidAt: "2026-10-05", amount: 10, parkingAmount: 0, notes: null, allocations: [] })
     expect(text).not.toContain("Notas")
     expect(text).not.toContain("Cuota")
   })

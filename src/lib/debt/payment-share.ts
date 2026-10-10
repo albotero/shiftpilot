@@ -15,6 +15,7 @@ export type SharedDebtPaymentAllocation = {
 }
 
 export type SharedDebtPayment = {
+  paidAt: string
   amount: number
   parkingAmount: number
   notes: string | null
@@ -34,6 +35,7 @@ function formatDate(date: string, pattern: string) {
 export function buildDebtPaymentShareText(payment: SharedDebtPayment) {
   const total = addMoney(payment.amount, payment.parkingAmount)
   const lines = [
+    `Fecha de transferencia: ${formatDate(payment.paidAt, "d 'de' MMMM 'de' yyyy")}`,
     `Total transferido: *${formatPesos(total)}*`,
     `• Abono a deuda: ${formatPesos(payment.amount)}`,
     `• Parqueadero: ${formatPesos(payment.parkingAmount)}`,
