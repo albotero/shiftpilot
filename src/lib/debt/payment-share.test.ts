@@ -41,7 +41,7 @@ describe("debt payment share", () => {
 
     expect(text).toBe(
       [
-        "Fecha de transferencia: 5 de octubre de 2026",
+        "Fecha de transferencia: 05-oct-2026",
         "Total transferido: *$3.120.500*",
         "• Abono a deuda: $3.000.500",
         "• Parqueadero: $120.000",

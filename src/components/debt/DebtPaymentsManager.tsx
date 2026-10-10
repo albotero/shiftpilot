@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type FormEvent } from "react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import { Pencil, Share2, Trash2 } from "lucide-react"
+import { CircleCheck, Clock3, Pencil, Share2, Trash2 } from "lucide-react"
 import { MoneyInput } from "@/components/forms/MoneyInput"
 import type { DebtSummary } from "@/lib/debt/calculations"
 import { buildDebtPaymentShareText, getWhatsAppShareUrl } from "@/lib/debt/payment-share"
@@ -432,7 +432,22 @@ export function DebtPaymentsManager() {
                           <div className="debt-payment-allocation-heading">
                             <strong>Cuota {allocation.installment}</strong>
                             <span>{formatPaymentMonth(allocation.dueDate)}</span>
+                            <span
+                              className={`debt-installment-status ${allocation.installmentBalanceAfterAmount === 0 ? "paid" : "pending"}`}
+                              title="Estado después de este pago"
+                            >
+                              {allocation.installmentBalanceAfterAmount === 0 ? (
+                                <><CircleCheck size={14} aria-hidden="true" /> Pagada</>
+                              ) : (
+                                <><Clock3 size={14} aria-hidden="true" /> Pendiente</>
+                              )}
+                            </span>
                           </div>
+                          {allocation.installmentBalanceAfterAmount > 0 && (
+                            <p className="debt-installment-pending-amount">
+                              Pendiente después del pago: <b>{formatAmount(allocation.installmentBalanceAfterAmount)} mil COP</b>
+                            </p>
+                          )}
                           <div className="debt-payment-allocation-details">
                             <span>Interés <b>{formatAmount(allocation.interestAmount)} mil</b></span>
                             <span>Capital <b>{formatAmount(allocation.principalAmount)} mil</b></span>

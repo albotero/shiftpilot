@@ -2502,6 +2502,27 @@ a {
   gap: 3px 12px;
 }
 
+.debt-installment-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+  font-weight: 600;
+}
+
+.debt-installment-status.paid {
+  color: var(--forest);
+}
+
+.debt-installment-status.pending,
+.debt-installment-pending-amount {
+  color: #8b551c;
+}
+
+.debt-installment-pending-amount {
+  margin: 2px 0 0;
+}
+
 .debt-payment-allocation-details span {
   display: inline-flex;
   flex-wrap: wrap;
