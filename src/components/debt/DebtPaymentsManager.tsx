@@ -453,7 +453,7 @@ export function DebtPaymentsManager() {
                           </div>
                           {allocation.installmentBalanceAfterAmount > 0 && (
                             <p className="debt-installment-pending-amount">
-                              Pendiente después del pago: <b>{formatAmount(allocation.installmentBalanceAfterAmount)} mil COP</b>
+                              Pendiente después del pago: <b>{formatAmount(allocation.installmentBalanceAfterAmount)} mil</b>
                             </p>
                           )}
                         </li>
