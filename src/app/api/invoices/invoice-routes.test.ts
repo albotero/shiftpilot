@@ -59,7 +59,7 @@ beforeEach(() => {
 describe("invoice routes", () => {
   it("creates a POS invoice with separate shift discount and due date", async () => {
     prismaMock.prisma.invoice.findMany.mockResolvedValue([
-      { grossAmount: 1000, discountAmount: 120, shiftDiscountAmount: 50, netAmount: 830 },
+      { grossAmount: 1000, discountAmount: 120, shiftDiscountAmount: 50, netAmount: 830, includeInIbc: true },
     ])
     prismaMock.prisma.invoice.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       id: "invoice-pos",
@@ -75,6 +75,7 @@ describe("invoice routes", () => {
         serviceDate: "2026-10-01",
         invoiceDate: "2026-10-03",
         status: "FACTURADA",
+        includeInIbc: true,
         shiftDiscountAmount: 50,
         items: [{ description: "Servicio", quantity: 1, unitAmount: 1000 }],
       }),
@@ -87,6 +88,7 @@ describe("invoice routes", () => {
       discountAmount: 120,
       shiftDiscountAmount: 50,
       netAmount: 830,
+      includeInIbc: true,
       expectedPaymentDate: "2027-01-01",
       items: [{ description: "Servicio", grossAmount: 1000 }],
     })
@@ -117,7 +119,13 @@ describe("invoice routes", () => {
 
   it("persists imported SOMA POS totals without recalculating PDF discounts", async () => {
     prismaMock.prisma.invoice.findMany.mockResolvedValue([
-      { grossAmount: 47445.123, discountAmount: 16824.665, shiftDiscountAmount: 0, netAmount: 30620.458 },
+      {
+        grossAmount: 47445.123,
+        discountAmount: 16824.665,
+        shiftDiscountAmount: 0,
+        netAmount: 30620.458,
+        includeInIbc: true,
+      },
     ])
     prismaMock.prisma.invoice.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       id: "invoice-imported",
@@ -145,6 +153,7 @@ describe("invoice routes", () => {
         expectedPaymentDate: "2026-12-29",
         pdfTotalAmount: 30620.458,
         status: "FACTURADA",
+        includeInIbc: true,
         items: [
           {
             description: "SERVICIOS ANESTESIOLOGIA POS",
@@ -166,6 +175,7 @@ describe("invoice routes", () => {
       discountAmount: 16824.665,
       shiftDiscountAmount: 0,
       netAmount: 30620.458,
+      includeInIbc: true,
       items: [{ unitAmount: 47445.123, discountAmount: 16824.665, grossAmount: 47445.123 }],
     })
     expect(prismaMock.prisma.invoice.create).toHaveBeenCalledWith(
@@ -213,6 +223,87 @@ describe("invoice routes", () => {
             lt: new Date("2026-11-01T00:00:00.000Z"),
           },
         },
+      }),
+    )
+  })
+
+  it("creates invoices excluded from IBC by default", async () => {
+    prismaMock.prisma.invoice.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
+      id: "invoice-excluded",
+      ...data,
+      invoiceDate: null,
+      expectedPaymentDate: new Date("2027-01-01T00:00:00.000Z"),
+      items: [],
+    }))
+    prismaMock.prisma.invoice.findMany.mockResolvedValue([
+      { grossAmount: 5000, discountAmount: 0, shiftDiscountAmount: 0, netAmount: 5000, includeInIbc: false },
+    ])
+
+    const response = await POST(
+      jsonRequest("POST", {
+        type: "SEDARTE",
+        serviceDate: "2026-10-01",
+        status: "FACTURADA",
+        items: [{ description: "Servicio", quantity: 1, unitAmount: 5000 }],
+      }),
+    )
+
+    expect(response.status).toBe(201)
+    expect((await response.json()).includeInIbc).toBe(false)
+    expect(prismaMock.prisma.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({ data: expect.objectContaining({ includeInIbc: false }) }),
+    )
+    expect(prismaMock.prisma.socialSecurityPeriod.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({ create: expect.objectContaining({ ibcAmount: 1_750.905 }) }),
+    )
+  })
+
+  it("toggles invoice IBC inclusion and recalculates its service month", async () => {
+    prismaMock.prisma.invoice.findUnique.mockResolvedValue({
+      serviceDate: new Date("2026-10-07T00:00:00.000Z"),
+    })
+    prismaMock.prisma.invoice.update.mockResolvedValue({
+      id: "invoice-ibc",
+      type: "SEDARTE",
+      serviceDate: new Date("2026-10-07T00:00:00.000Z"),
+      invoiceDate: null,
+      invoiceNumber: "S-1",
+      expectedPaymentDate: null,
+      pdfTotalAmount: null,
+      grossAmount: 5000,
+      discountAmount: 500,
+      shiftDiscountAmount: 0,
+      netAmount: 4500,
+      includeInIbc: false,
+      privateShiftCount: 0,
+      privateShiftAmount: 0,
+      status: "FACTURADA",
+      paidAt: null,
+      notes: null,
+      items: [],
+    })
+    prismaMock.prisma.invoice.findMany.mockResolvedValue([
+      {
+        grossAmount: 5000,
+        discountAmount: 500,
+        shiftDiscountAmount: 0,
+        netAmount: 4500,
+        includeInIbc: false,
+      },
+    ])
+
+    const response = await PATCH(jsonRequest("PATCH", { id: "invoice-ibc", includeInIbc: false }))
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ id: "invoice-ibc", includeInIbc: false })
+    expect(prismaMock.prisma.invoice.update).toHaveBeenCalledWith({
+      where: { id: "invoice-ibc" },
+      data: { includeInIbc: false },
+      include: { items: true },
+    })
+    expect(prismaMock.prisma.socialSecurityPeriod.upsert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        update: expect.objectContaining({ netAmount: 4500, ibcAmount: 1_750.905 }),
       }),
     )
   })

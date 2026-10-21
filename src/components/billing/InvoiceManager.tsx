@@ -32,6 +32,7 @@ type InvoiceRecord = {
   grossAmount: number
   discountAmount: number
   shiftDiscountAmount: number
+  includeInIbc: boolean
   netAmount: number
   privateShiftCount: number
   privateShiftAmount: number
@@ -108,11 +109,13 @@ export function InvoiceManager({
   const [invoiceNumber, setInvoiceNumber] = useState("")
   const [expectedPaymentDateOverride, setExpectedPaymentDateOverride] = useState("")
   const [shiftDiscountAmount, setShiftDiscountAmount] = useState("0")
+  const [includeInIbc, setIncludeInIbc] = useState(false)
   const [privateShiftCount, setPrivateShiftCount] = useState("0")
   const [notes, setNotes] = useState("")
   const [items, setItems] = useState<ItemDraft[]>([createItem()])
   const [editingId, setEditingId] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [savingIbcId, setSavingIbcId] = useState<string | null>(null)
   const [pdfImporting, setPdfImporting] = useState(false)
   const [pdfReportedTotal, setPdfReportedTotal] = useState<number | null>(null)
   const [error, setError] = useState("")
@@ -154,6 +157,7 @@ export function InvoiceManager({
     expectedPaymentDate: expectedPaymentDateOverride || null,
     pdfTotalAmount: pdfReportedTotal,
     status: editingId ? storedStatus : "FACTURADA",
+    includeInIbc,
     paidAt: editingId && storedStatus === "PAGADA" ? storedPaidAt || null : null,
     shiftDiscountAmount: type === "SOMA_POS" ? Number(shiftDiscountAmount) : 0,
     privateShiftCount: type === "SOMA_PARTICULAR" ? Number(privateShiftCount) : 0,
@@ -200,6 +204,7 @@ export function InvoiceManager({
     setInvoiceNumber("")
     setExpectedPaymentDateOverride("")
     setShiftDiscountAmount("0")
+    setIncludeInIbc(false)
     setPrivateShiftCount("0")
     setNotes("")
     setItems([createItem()])
@@ -217,6 +222,7 @@ export function InvoiceManager({
     setInvoiceNumber(invoice.invoiceNumber ?? "")
     setExpectedPaymentDateOverride(invoice.expectedPaymentDate ?? "")
     setPdfReportedTotal(invoice.pdfTotalAmount)
+    setIncludeInIbc(invoice.includeInIbc)
     setShiftDiscountAmount(String(invoice.shiftDiscountAmount))
     setPrivateShiftCount(String(invoice.privateShiftCount))
     setNotes(invoice.notes ?? "")
@@ -243,6 +249,7 @@ export function InvoiceManager({
     try {
       const imported = parseInvoicePdfText(await extractInvoiceTextFromPdf(file))
       setEditingId(null)
+      setIncludeInIbc(false)
       setInvoiceNumber(imported.invoiceNumber ?? "")
       if (imported.type) setType(imported.type)
       setInvoiceDate(imported.invoiceDate ?? imported.serviceDate ?? "")
@@ -320,6 +327,36 @@ export function InvoiceManager({
       onInvoicesChanged()
     } catch (deleteError) {
       setError(errorMessage(deleteError, "No se pudo eliminar la factura."))
+    }
+  }
+
+  async function toggleInvoiceIbc(invoice: InvoiceRecord) {
+    setSavingIbcId(invoice.id)
+    setError("")
+    setMessage("")
+    try {
+      const response = await fetch("/api/invoices", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: invoice.id, includeInIbc: !invoice.includeInIbc }),
+      })
+      const result = await response.json()
+      if (!response.ok) throw new Error(result.error ?? "No se pudo actualizar la inclusión en el IBC.")
+      const updatedInvoice = result as InvoiceRecord
+      setInvoices((current) =>
+        current.map((item) => (item.id === updatedInvoice.id ? updatedInvoice : item)),
+      )
+      if (editingId === invoice.id) setIncludeInIbc(updatedInvoice.includeInIbc)
+      setMessage(
+        updatedInvoice.includeInIbc
+          ? "La factura se incluirá en el cálculo del IBC."
+          : "La factura se excluyó del cálculo del IBC.",
+      )
+      onInvoicesChanged()
+    } catch (toggleError) {
+      setError(errorMessage(toggleError, "No se pudo actualizar la inclusión en el IBC."))
+    } finally {
+      setSavingIbcId(null)
     }
   }
 
@@ -503,6 +540,18 @@ export function InvoiceManager({
           <textarea maxLength={500} rows={2} value={notes} onChange={(event) => setNotes(event.target.value)} />
         </label>
 
+        <label className="invoice-ibc-option">
+          <input
+            type="checkbox"
+            checked={includeInIbc}
+            onChange={(event) => setIncludeInIbc(event.target.checked)}
+          />
+          <span>
+            <strong>Incluir en el cálculo del IBC</strong>
+            <small>Desmárcala si el neto de esta factura no debe aportar a la base de cotización.</small>
+          </span>
+        </label>
+
         <div className="invoice-calculation" aria-live="polite">
           <div>
             <span>Vencimiento estimado</span>
@@ -582,6 +631,7 @@ export function InvoiceManager({
                 <th>Institución o unidad</th>
                 <th>Factura / vence</th>
                 <th className="amount-column">Neto</th>
+                <th>IBC</th>
                 <th />
               </tr>
             </thead>
@@ -594,6 +644,18 @@ export function InvoiceManager({
                     {formatDate(invoice.invoiceDate)} / {formatDate(invoice.expectedPaymentDate)}
                   </td>
                   <td className="amount-column">{formatAmount(invoice.netAmount)}</td>
+                  <td>
+                    <label className="invoice-ibc-toggle">
+                      <input
+                        type="checkbox"
+                        aria-label={`${invoice.includeInIbc ? "Excluir" : "Incluir"} ${typeLabels[invoice.type]} ${invoice.invoiceNumber ?? ""} en el cálculo del IBC`}
+                        checked={invoice.includeInIbc}
+                        disabled={savingIbcId !== null}
+                        onChange={() => void toggleInvoiceIbc(invoice)}
+                      />
+                      <span>{invoice.includeInIbc ? "Incluir" : "Excluida"}</span>
+                    </label>
+                  </td>
                   <td className="invoice-row-actions">
                     <button
                       type="button"

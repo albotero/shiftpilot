@@ -244,6 +244,7 @@ model Invoice {
   discountAmount        Decimal      @default(0) @db.Decimal(18, 3)
   shiftDiscountAmount   Decimal      @default(0) @db.Decimal(18, 3)
   netAmount             Decimal      @db.Decimal(18, 3)
+  includeInIbc          Boolean      @default(false)
   privateShiftCount     Int          @default(0)
   privateShiftAmount    Decimal      @default(0) @db.Decimal(18, 3)
   status                InvoiceStatus @default(PENDIENTE)

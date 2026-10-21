@@ -40,6 +40,7 @@ export const invoiceMutationSchema = z
     invoiceNumber: z.string().trim().max(64).nullable().optional(),
     expectedPaymentDate: z.union([z.iso.date(), z.null()]).optional(),
     pdfTotalAmount: moneyAmountSchema().nullable().optional(),
+    includeInIbc: z.boolean().optional(),
     status: z.enum(invoiceStatuses),
     paidAt: z.union([z.iso.date(), z.null()]).optional(),
     shiftDiscountAmount: moneyAmountSchema().optional(),

@@ -36,6 +36,7 @@ function mapInvoice(invoice: InvoiceWithItems) {
     discountAmount: Number(invoice.discountAmount),
     shiftDiscountAmount: Number(invoice.shiftDiscountAmount),
     netAmount: Number(invoice.netAmount),
+    includeInIbc: invoice.includeInIbc,
     privateShiftCount: invoice.privateShiftCount,
     privateShiftAmount: Number(invoice.privateShiftAmount),
     status: invoice.status,
@@ -105,6 +106,9 @@ async function buildInvoiceData(
     discountAmount: totals.discountAmount,
     shiftDiscountAmount: totals.shiftDiscountAmount,
     netAmount: totals.netAmount,
+    ...(!replaceItems || input.includeInIbc !== undefined
+      ? { includeInIbc: input.includeInIbc ?? false }
+      : {}),
     privateShiftCount: input.type === "SOMA_PARTICULAR" ? (input.privateShiftCount ?? 0) : 0,
     privateShiftAmount: totals.privateShiftAmount,
     status: input.status,
@@ -220,6 +224,47 @@ export async function POST(request: Request) {
 }
 
 export async function PATCH(request: Request) {
+  const bodyRequest = request.clone()
+  let body: unknown
+  try {
+    body = await bodyRequest.json()
+  } catch {
+    body = null
+  }
+  if (
+    typeof body === "object" &&
+    body !== null &&
+    "includeInIbc" in body &&
+    !("type" in body)
+  ) {
+    const parsedToggle = z.object({ id: z.string().min(1), includeInIbc: z.boolean() }).safeParse(body)
+    if (!parsedToggle.success) {
+      return Response.json({ error: "Opción de inclusión en IBC inválida" }, { status: 400 })
+    }
+    try {
+      const currentInvoice = await prisma.invoice.findUnique({
+        where: { id: parsedToggle.data.id },
+        select: { serviceDate: true },
+      })
+      if (!currentInvoice) return Response.json({ error: "No se encontró la factura" }, { status: 404 })
+      const month = currentInvoice.serviceDate.toISOString().slice(0, 7)
+      const minimumWage = await getMinimumWageForYear(prisma, Number(month.slice(0, 4)))
+      const invoice = await prisma.$transaction(async (transaction) => {
+        const updated = await transaction.invoice.update({
+          where: { id: parsedToggle.data.id },
+          data: { includeInIbc: parsedToggle.data.includeInIbc },
+          include: { items: true },
+        })
+        await recalculateSocialSecurityPeriod(transaction, month, minimumWage)
+        return updated
+      })
+      return Response.json(mapInvoice(invoice))
+    } catch (error) {
+      if (isMissingRecord(error)) return Response.json({ error: "No se encontró la factura" }, { status: 404 })
+      return Response.json({ error: "No se pudo actualizar la inclusión en el IBC" }, { status: 503 })
+    }
+  }
+
   const parsed = await parseInvoiceRequest(request)
   if ("response" in parsed) return parsed.response
   if (!parsed.data.id) return Response.json({ error: "Falta el identificador de la factura" }, { status: 400 })

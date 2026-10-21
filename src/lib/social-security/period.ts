@@ -16,6 +16,7 @@ export type InvoiceMonthlyAmounts = {
   discountAmount: number
   shiftDiscountAmount: number
   netAmount: number
+  includeInIbc?: boolean
 }
 
 export type SocialSecurityPeriodDatabase = Pick<
@@ -40,7 +41,10 @@ export function calculateSocialSecurityPeriod(
   const grossAmount = addMoney(...invoices.map((invoice) => invoice.grossAmount))
   const discounts = addMoney(...invoices.flatMap((invoice) => [invoice.discountAmount, invoice.shiftDiscountAmount]))
   const netAmount = addMoney(...invoices.map((invoice) => invoice.netAmount))
-  const ibcPercentage = roundMoneyAmount(netAmount * 0.4)
+  const ibcNetAmount = addMoney(
+    ...invoices.filter((invoice) => invoice.includeInIbc !== false).map((invoice) => invoice.netAmount),
+  )
+  const ibcPercentage = roundMoneyAmount(ibcNetAmount * 0.4)
   const ibcAmount = maxMoney(ibcPercentage, minimumIbcAmount)
   const calculatedRates = getCalculatedSocialSecurityRates(configuration, ibcAmount, minimumWageAmount)
   const rates = { ...calculatedRates, ...ratesOverride, solidarityRatePpm: calculatedRates.solidarityRatePpm }
@@ -73,7 +77,7 @@ export async function recalculateSocialSecurityPeriod(
   const [invoices, settingRecords, existingPeriod] = await Promise.all([
     database.invoice.findMany({
       where: { serviceDate: { gte: monthStart, lt: nextMonth } },
-      select: { grossAmount: true, discountAmount: true, shiftDiscountAmount: true, netAmount: true },
+      select: { grossAmount: true, discountAmount: true, shiftDiscountAmount: true, netAmount: true, includeInIbc: true },
     }),
     database.appSetting.findMany({ where: { key: { startsWith: "socialSecurity." } } }),
     database.socialSecurityPeriod.findUnique({ where: { month: monthStart } }),
@@ -120,6 +124,7 @@ export async function recalculateSocialSecurityPeriod(
       discountAmount: Number(invoice.discountAmount),
       shiftDiscountAmount: Number(invoice.shiftDiscountAmount),
       netAmount: Number(invoice.netAmount),
+      includeInIbc: invoice.includeInIbc,
     })),
     configuration,
     roundMoneyAmount(periodMinimumWage.amount),

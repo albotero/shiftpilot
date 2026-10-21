@@ -3295,6 +3295,40 @@ a {
   max-width: 760px;
 }
 
+.invoice-ibc-option {
+  display: flex;
+  width: fit-content;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 12px;
+  border: 1px solid #e6ebe4;
+  border-radius: 5px;
+  background: #f8faf7;
+}
+
+.invoice-ibc-option input,
+.invoice-ibc-toggle input {
+  width: 16px;
+  height: 16px;
+  margin: 1px 0 0;
+  accent-color: var(--forest);
+}
+
+.invoice-ibc-option > span {
+  display: grid;
+  gap: 3px;
+}
+
+.invoice-ibc-option strong {
+  color: #34483b;
+  font-size: 11px;
+}
+
+.invoice-ibc-option small {
+  color: #758078;
+  font-size: 9px;
+}
+
 .invoice-calculation {
   display: flex;
   flex-wrap: wrap;
@@ -3359,7 +3393,7 @@ a {
 
 .invoice-table {
   width: 100%;
-  min-width: 740px;
+  min-width: 810px;
   border-collapse: collapse;
   text-align: left;
 }
@@ -3408,6 +3442,26 @@ a {
   display: flex;
   justify-content: flex-end;
   gap: 4px;
+}
+
+.invoice-ibc-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #536257;
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.invoice-ibc-toggle input {
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--forest);
+}
+
+.invoice-ibc-toggle input:disabled {
+  cursor: wait;
 }
 
 .invoice-row-actions .icon-button {

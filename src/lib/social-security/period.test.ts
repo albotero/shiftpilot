@@ -35,6 +35,26 @@ describe("monthly social security period", () => {
     expect(period).toMatchObject({ grossAmount: 0.002, netAmount: 0.002, ibcAmount: 0.001 })
   })
 
+  it("excludes opted-out invoices from IBC but keeps them in gross, discounts, and net totals", () => {
+    const period = calculateSocialSecurityPeriod([
+      { grossAmount: 10_000, discountAmount: 1_000, shiftDiscountAmount: 0, netAmount: 9_000 },
+      {
+        grossAmount: 5_000,
+        discountAmount: 500,
+        shiftDiscountAmount: 0,
+        netAmount: 4_500,
+        includeInIbc: false,
+      },
+    ])
+
+    expect(period).toMatchObject({
+      grossAmount: 15_000,
+      discounts: 1_500,
+      netAmount: 13_500,
+      ibcAmount: 3_600,
+    })
+  })
+
   it.each(["2026-00", "2026-13", "2026-1", "1899-12", "9999-01"])(
     "rejects invalid period %s before accessing the database",
     async (month) => {
@@ -153,7 +173,7 @@ describe("monthly social security period", () => {
           lt: new Date("2026-10-01T00:00:00.000Z"),
         },
       },
-      select: { grossAmount: true, discountAmount: true, shiftDiscountAmount: true, netAmount: true },
+      select: { grossAmount: true, discountAmount: true, shiftDiscountAmount: true, netAmount: true, includeInIbc: true },
     })
     expect(database.socialSecurityPeriod.upsert).toHaveBeenCalledTimes(2)
     expect(database.socialSecurityPeriod.upsert).toHaveBeenNthCalledWith(

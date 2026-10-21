@@ -1,0 +1,2 @@
+ALTER TABLE "Invoice"
+ADD COLUMN "includeInIbc" BOOLEAN NOT NULL DEFAULT false;
