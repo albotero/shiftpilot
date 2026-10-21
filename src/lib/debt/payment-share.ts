@@ -50,7 +50,7 @@ export function buildDebtPaymentShareText(payment: SharedDebtPayment) {
       `• Saldo a capital: ${formatPesos(balance.balanceAfterAmount)}`,
       `• Saldo total (capital + intereses): ${formatPesos(balance.totalBalanceAfterAmount)}`,
       "",
-      "────────────────────",
+      "────────",
     )
   }
 

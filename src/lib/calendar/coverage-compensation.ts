@@ -15,6 +15,15 @@ export type CoveredShiftRow = {
   totalAmountThousands: number
 }
 
+export type CoveredShiftDetail = {
+  id: string
+  anesthesiologist: string
+  date: string
+  period: string
+  jornadas: number
+  amountThousands: number
+}
+
 export type CoveredShiftSummary = {
   rows: CoveredShiftRow[]
   totalJornadas: number
@@ -53,6 +62,37 @@ export function getCoveredShiftRateForDate(rates: CoveredShiftRate[], date: stri
   )
 }
 
+export function getCoveredShiftDetails(
+  entries: CalendarEntry[],
+  month: Date,
+  rates: CoveredShiftRate[],
+): CoveredShiftDetail[] {
+  return entries
+    .filter(
+      (entry) =>
+        entry.kind === "SOMA" &&
+        entry.status === "TURNO_OTRA_PERSONA" &&
+        isSameMonth(new Date(`${entry.date}T12:00:00`), month),
+    )
+    .map((entry) => {
+      const jornadas = entry.period === "AM + PM" || entry.period === "NOCHE" ? 2 : 1
+      return {
+        id: entry.id,
+        anesthesiologist: entry.anesthesiologist?.trim() || "Sin nombre registrado",
+        date: entry.date,
+        period: entry.period ?? "Turno",
+        jornadas,
+        amountThousands: jornadas * getCoveredShiftRateForDate(rates, entry.date),
+      }
+    })
+    .sort(
+      (left, right) =>
+        left.date.localeCompare(right.date) ||
+        left.period.localeCompare(right.period, "es") ||
+        left.id.localeCompare(right.id),
+    )
+}
+
 export function getCoveredShiftSummary(
   entries: CalendarEntry[],
   month: Date,
@@ -60,24 +100,14 @@ export function getCoveredShiftSummary(
 ): CoveredShiftSummary {
   const totalsByAnesthesiologist = new Map<string, { jornadas: number; totalAmountThousands: number }>()
 
-  for (const entry of entries) {
-    if (
-      entry.kind !== "SOMA" ||
-      entry.status !== "TURNO_OTRA_PERSONA" ||
-      !isSameMonth(new Date(`${entry.date}T12:00:00`), month)
-    ) {
-      continue
+  for (const shift of getCoveredShiftDetails(entries, month, rates)) {
+    const total = totalsByAnesthesiologist.get(shift.anesthesiologist) ?? {
+      jornadas: 0,
+      totalAmountThousands: 0,
     }
-
-    const anesthesiologist = entry.anesthesiologist?.trim() || "Sin nombre registrado"
-    const jornadas = entry.period === "AM + PM" || entry.period === "NOCHE" ? 2 : 1
-    const total = totalsByAnesthesiologist.get(anesthesiologist) ?? { jornadas: 0, totalAmountThousands: 0 }
-    total.jornadas += jornadas
-    total.totalAmountThousands = addMoney(
-      total.totalAmountThousands,
-      jornadas * getCoveredShiftRateForDate(rates, entry.date),
-    )
-    totalsByAnesthesiologist.set(anesthesiologist, total)
+    total.jornadas += shift.jornadas
+    total.totalAmountThousands = addMoney(total.totalAmountThousands, shift.amountThousands)
+    totalsByAnesthesiologist.set(shift.anesthesiologist, total)
   }
 
   const rows = [...totalsByAnesthesiologist]

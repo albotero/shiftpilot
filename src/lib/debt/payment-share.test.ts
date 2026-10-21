@@ -51,7 +51,7 @@ describe("debt payment share", () => {
         "• Saldo a capital: $18.889.750",
         "• Saldo total (capital + intereses): $21.499.500",
         "",
-        "────────────────────",
+        "────────",
         "",
         "*Cuota 4* · septiembre 2026",
         "• Capital: $1.100.000",

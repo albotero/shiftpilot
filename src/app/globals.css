@@ -728,18 +728,25 @@ a {
 .coverage-summary-table thead th:nth-child(2),
 .coverage-summary-table tbody td:nth-child(2),
 .coverage-summary-table tfoot td:nth-child(2) {
-  width: 92px;
+  width: 58px;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-.coverage-summary-table thead th:last-child,
-.coverage-summary-table tbody td:last-child,
-.coverage-summary-table tfoot td:last-child {
-  width: 150px;
+.coverage-summary-table thead th:nth-child(3),
+.coverage-summary-table tbody td:nth-child(3),
+.coverage-summary-table tfoot td:nth-child(3) {
+  width: 132px;
   text-align: right;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.coverage-summary-table thead th:nth-child(4),
+.coverage-summary-table tbody td:nth-child(4),
+.coverage-summary-table tfoot td:nth-child(4) {
+  width: 76px;
+  text-align: center;
 }
 
 .coverage-summary-table tbody th {
@@ -769,6 +776,73 @@ a {
   margin: 0;
   padding: 12px 0 2px;
   color: #7c8780;
+  font-size: 10px;
+}
+
+.coverage-share-toggle,
+.coverage-shift-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #435c48;
+  cursor: pointer;
+}
+
+.coverage-share-toggle {
+  justify-content: center;
+  font-size: 9px;
+}
+
+.coverage-share-toggle input,
+.coverage-shift-option input {
+  accent-color: var(--forest);
+}
+
+.coverage-shift-selection-row td {
+  padding: 8px 4px 10px;
+  background: #f8faf7;
+}
+
+.coverage-shift-selection {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px 12px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.coverage-shift-selection legend {
+  margin-bottom: 7px;
+  color: #627067;
+  font-size: 9px;
+}
+
+.coverage-shift-option {
+  font-size: 9px;
+  white-space: nowrap;
+}
+
+.coverage-share-actions {
+  display: grid;
+  justify-items: start;
+  gap: 6px;
+}
+
+.coverage-share-button {
+  min-height: 34px;
+  padding: 0 12px;
+}
+
+.coverage-share-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+  transform: none;
+}
+
+.coverage-share-error {
+  margin: 0;
+  color: #a33831;
   font-size: 10px;
 }
 
