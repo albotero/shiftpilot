@@ -22,14 +22,13 @@ function formatThousandsCop(amountThousands: number) {
 export function CoveredShiftSummary({ entries, month }: { entries: CalendarEntry[]; month: Date }) {
   const [rate, setRate] = useState(DEFAULT_COVERED_SHIFT_RATE_THOUSANDS)
   const [rates, setRates] = useState<CoveredShiftRate[]>(() => [...DEFAULT_COVERED_SHIFT_RATE_HISTORY])
+  const [includeDateDetails, setIncludeDateDetails] = useState(false)
   const monthKey = format(month, "yyyy-MM")
   const [selection, setSelection] = useState<{ monthKey: string; ids: Set<string> }>(() => ({
     monthKey,
     ids: new Set(),
   }))
-  const [shareIssue, setShareIssue] = useState<{ monthKey: string; message: string } | null>(null)
   const selectedShiftIds = selection.monthKey === monthKey ? selection.ids : new Set<string>()
-  const shareError = shareIssue?.monthKey === monthKey ? shareIssue.message : ""
   const shifts = getCoveredShiftDetails(entries, month, rates)
   const summary = getCoveredShiftSummary(entries, month, rates)
   const shiftsByAnesthesiologist = new Map<string, typeof shifts>()
@@ -66,7 +65,6 @@ export function CoveredShiftSummary({ entries, month }: { entries: CalendarEntry
       }
       return { monthKey, ids: next }
     })
-    setShareIssue(null)
   }
 
   function toggleShift(id: string) {
@@ -76,27 +74,13 @@ export function CoveredShiftSummary({ entries, month }: { entries: CalendarEntry
       else next.add(id)
       return { monthKey, ids: next }
     })
-    setShareIssue(null)
   }
 
-  async function shareSelectedShifts() {
-    const text = buildCoveredShiftShareText(shifts, selectedShiftIds, month)
+  function shareSelectedShifts() {
+    const text = buildCoveredShiftShareText(shifts, selectedShiftIds, month, includeDateDetails)
     if (!text) return
 
-    setShareIssue(null)
-    if (typeof navigator.share === "function") {
-      try {
-        await navigator.share({ text })
-        return
-      } catch (error) {
-        if (error instanceof DOMException && error.name === "AbortError") return
-        setShareIssue({
-          monthKey,
-          message: "No se pudo abrir el menú de compartir. Se intentará abrir WhatsApp.",
-        })
-      }
-    }
-    window.location.assign(`https://wa.me/?text=${encodeURIComponent(text)}`)
+    window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, "_blank", "noopener,noreferrer")
   }
 
   return (
@@ -187,6 +171,14 @@ export function CoveredShiftSummary({ entries, month }: { entries: CalendarEntry
         <p className="coverage-summary-empty">Sin turnos cubiertos en este mes.</p>
       )}
       <div className="coverage-share-actions">
+        <label className="coverage-share-toggle">
+          <input
+            type="checkbox"
+            checked={includeDateDetails}
+            onChange={(event) => setIncludeDateDetails(event.target.checked)}
+          />
+          Incluir desglose por fecha
+        </label>
         <button
           type="button"
           className="submit-button coverage-share-button"
@@ -196,7 +188,6 @@ export function CoveredShiftSummary({ entries, month }: { entries: CalendarEntry
           <Share2 size={14} aria-hidden="true" />
           Compartir seleccionados por WhatsApp
         </button>
-        {shareError && <p className="coverage-share-error" role="alert">{shareError}</p>}
       </div>
     </section>
   )
