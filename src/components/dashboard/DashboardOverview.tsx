@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useSyncExternalStore } from "react"
 import Link from "next/link"
-import { format, isSameMonth } from "date-fns"
+import { addMonths, endOfMonth, format, isSameMonth } from "date-fns"
 import { es } from "date-fns/locale"
 import {
   Activity,
@@ -27,6 +27,8 @@ import {
   isUpcomingCalendarEntry,
 } from "@/lib/calendar/utils"
 import { getCalendarEntries, getServerCalendarSnapshot, subscribeToCalendar } from "@/lib/calendar/storage"
+import { calendarEntriesSchema } from "@/lib/calendar/schema"
+import type { CalendarEntry } from "@/lib/calendar/types"
 
 type InvoiceSummary = { count: number; netAmount: number }
 type SocialSecuritySummary = { ibcAmount: number }
@@ -36,12 +38,16 @@ function formatAmount(amount: number) {
 }
 
 export function DashboardOverview() {
-  const entries = useSyncExternalStore(subscribeToCalendar, getCalendarEntries, getServerCalendarSnapshot)
+  const storedEntries = useSyncExternalStore(subscribeToCalendar, getCalendarEntries, getServerCalendarSnapshot)
+  const [recurringEntries, setRecurringEntries] = useState<CalendarEntry[]>([])
+  const entries = [...storedEntries, ...recurringEntries]
   const [activeDate] = useState(() => new Date())
   const now = new Date()
   const [invoiceSummary, setInvoiceSummary] = useState<InvoiceSummary>({ count: 0, netAmount: 0 })
   const [socialSecurity, setSocialSecurity] = useState<SocialSecuritySummary | null>(null)
   const activeMonth = format(activeDate, "yyyy-MM")
+  const recurrenceFrom = `${activeMonth}-01`
+  const recurrenceTo = format(endOfMonth(addMonths(activeDate, 1)), "yyyy-MM-dd")
   const monthEntries = entries.filter((entry) => isSameMonth(new Date(`${entry.date}T12:00:00`), activeDate))
   const shiftCount = getMonthSomaShiftCount(monthEntries, activeDate)
   const eventCount = monthEntries.filter((entry) => entry.kind === "SEDARTE" || entry.kind === "PERSONAL").length
@@ -59,6 +65,22 @@ export function DashboardOverview() {
     .filter((entry) => isUpcomingCalendarEntry(entry, todayKey, currentMinute))
     .sort(compareCalendarEntriesByStart)
     .slice(0, 6)
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetch(`/api/calendar/recurrences?from=${recurrenceFrom}&to=${recurrenceTo}`, {
+      cache: "no-store",
+      signal: controller.signal,
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("No se pudieron cargar las series recurrentes.")
+        const parsed = calendarEntriesSchema.safeParse(await response.json())
+        if (!parsed.success) throw new Error("La respuesta de recurrencias no es válida.")
+        if (!controller.signal.aborted) setRecurringEntries(parsed.data)
+      })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [recurrenceFrom, recurrenceTo])
 
   useEffect(() => {
     const controller = new AbortController()
