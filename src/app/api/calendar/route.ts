@@ -185,7 +185,7 @@ export async function POST(request: Request) {
       const existingShifts = (await prisma.shift.findMany({ where: { workId: work.id, date } })).filter((shift) =>
         periods.includes(shift.period),
       )
-      if (existingShifts.some((shift) => shift.manualOverride)) {
+      if (!isCoverage && existingShifts.some((shift) => shift.manualOverride)) {
         return Response.json(
           { error: "Ya existe un ajuste manual para esa jornada; edítalo desde el calendario." },
           { status: 409 },
@@ -389,7 +389,10 @@ export async function PATCH(request: Request) {
               (shift) =>
                 shift.id !== current.id &&
                 shift.period !== current.period &&
-                (parsed.data.restoreAutomatic || shift.status === parsed.data.status),
+                requestedPeriods.includes(shift.period) &&
+                (parsed.data.restoreAutomatic ||
+                  shift.status === parsed.data.status ||
+                  (isCoverage && sourceDate === parsed.data.date)),
             )
           : undefined
       const primaryPeriod = requestedPeriods.includes(current.period) ? current.period : requestedPeriods[0]

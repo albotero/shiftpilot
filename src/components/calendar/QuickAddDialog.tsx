@@ -104,8 +104,8 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
   const [location, setLocation] = useState(initialEntry?.location ?? "")
   const [notes, setNotes] = useState(initialEntry?.notes ?? "")
   const [replacementPersonId, setReplacementPersonId] = useState(initialEntry?.replacementPersonId ?? "")
-  const [amReplacementPersonId, setAmReplacementPersonId] = useState("")
-  const [pmReplacementPersonId, setPmReplacementPersonId] = useState("")
+  const [amReplacementPersonId, setAmReplacementPersonId] = useState(initialEntry?.amReplacementPersonId ?? "")
+  const [pmReplacementPersonId, setPmReplacementPersonId] = useState(initialEntry?.pmReplacementPersonId ?? "")
   const [replacementPeople, setReplacementPeople] = useState<ReplacementPerson[]>([])
   const [loadingReplacementPeople, setLoadingReplacementPeople] = useState(true)
   const [error, setError] = useState("")
@@ -494,8 +494,14 @@ export function QuickAddDialog({ initialDate, initialEntry, onClose, onSave, onD
                           }
                           disabled={loadingReplacementPeople}
                           onChange={(event) => {
-                            if (half === "AM") setAmReplacementPersonId(event.target.value)
-                            else setPmReplacementPersonId(event.target.value)
+                            const personId = event.target.value
+                            if (half === "AM") {
+                              setAmReplacementPersonId(personId)
+                              setPmReplacementPersonId((current) => current || replacementPersonId || personId)
+                            } else {
+                              setPmReplacementPersonId(personId)
+                              setAmReplacementPersonId((current) => current || replacementPersonId || personId)
+                            }
                           }}
                           required
                         >

@@ -82,6 +82,87 @@ beforeEach(() => {
 })
 
 describe("Soma calendar route integration", () => {
+  it.each(["POST", "PATCH"])("%s assigns coverage over existing manual AM and PM shifts", async (method) => {
+    const shifts = [
+      { ...automaticNight, id: "manual-am", period: "AM", status: "R4", manualOverride: true, coverages: [] },
+      { ...automaticNight, id: "manual-pm", period: "PM", status: "TURNO", manualOverride: true, coverages: [] },
+      { ...automaticNight, id: "manual-night", manualOverride: true, coverages: [] },
+    ]
+    prismaMock.shift.findMany.mockResolvedValue(shifts)
+    prismaMock.shift.findUnique.mockResolvedValue(shifts[0])
+    prismaMock.replacementPerson.findUnique.mockImplementation(async ({ where }: { where: { id: string } }) => ({
+      id: where.id,
+      name: where.id === "person-am" ? "Ana" : "Bea",
+      active: true,
+    }))
+    prismaMock.shift.update.mockImplementation(async ({ where, data }: { where: { id: string }; data: object }) => ({
+      ...shifts.find((shift) => shift.id === where.id),
+      ...data,
+      coverages: [],
+    }))
+
+    const body = {
+      id: "manual-am",
+      date: "2026-10-01",
+      kind: "SOMA",
+      status: "TURNO_OTRA_PERSONA",
+      period: "AM + PM",
+      title: "Turno cubierto",
+      amReplacementPersonId: "person-am",
+      pmReplacementPersonId: "person-pm",
+    }
+    const response = await (method === "POST" ? POST : PATCH)(jsonRequest(body))
+
+    expect(response.status).toBe(method === "POST" ? 201 : 200)
+    expect(await response.json()).toMatchObject([
+      { id: "manual-am", period: "AM", status: "TURNO_OTRA_PERSONA" },
+      { id: "manual-pm", period: "PM", status: "TURNO_OTRA_PERSONA" },
+    ])
+    expect(prismaMock.shift.update).toHaveBeenCalledTimes(2)
+    for (const [period, personId] of [
+      ["AM", "person-am"],
+      ["PM", "person-pm"],
+    ]) {
+      expect(prismaMock.shift.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: { id: `manual-${period.toLowerCase()}` },
+          data: expect.objectContaining({
+            period,
+            manualOverride: true,
+            coverages: { deleteMany: {}, create: { person: { connect: { id: personId } } } },
+          }),
+        }),
+      )
+    }
+    expect(prismaMock.shift.create).not.toHaveBeenCalled()
+  })
+
+  it("still rejects moving coverage onto an occupied date without changing shifts", async () => {
+    const current = { ...automaticNight, period: "AM", coverages: [] }
+    prismaMock.shift.findUnique.mockResolvedValue(current)
+    prismaMock.shift.findMany
+      .mockResolvedValueOnce([current])
+      .mockResolvedValueOnce([{ ...current, id: "occupied-am", date: new Date("2026-10-02T00:00:00.000Z") }])
+    prismaMock.replacementPerson.findUnique.mockResolvedValue({ id: "person-am", name: "Ana", active: true })
+
+    const response = await PATCH(
+      jsonRequest({
+        id: current.id,
+        date: "2026-10-02",
+        kind: "SOMA",
+        status: "TURNO_OTRA_PERSONA",
+        period: "AM + PM",
+        title: "Turno cubierto",
+        replacementPersonId: "person-am",
+      }),
+    )
+
+    expect(response.status).toBe(409)
+    expect(prismaMock.shift.update).not.toHaveBeenCalled()
+    expect(prismaMock.shift.create).not.toHaveBeenCalled()
+    expect(prismaMock.$transaction).not.toHaveBeenCalled()
+  })
+
   it("creates an automatic Soma period using the planned status", async () => {
     prismaMock.appSetting.findMany.mockResolvedValue([{ key: "soma.annualPlan.2026", value: plan2026 }])
     prismaMock.shift.create.mockImplementation(
@@ -441,18 +522,17 @@ describe("Soma calendar route integration", () => {
     expect(prismaMock.shift.create).not.toHaveBeenCalled()
   })
 
-  it("does not overwrite an existing manual Soma shift", async () => {
+  it("does not overwrite an existing manual Soma shift with a non-coverage creation", async () => {
     prismaMock.shift.findMany.mockResolvedValue([{ ...automaticNight, manualOverride: true }])
 
     const response = await POST(
       jsonRequest({
-        id: "second-coverage",
+        id: "second-manual",
         date: "2026-10-01",
         kind: "SOMA",
-        status: "TURNO_OTRA_PERSONA",
+        status: "EXTERNO_NOCHE",
         period: "NOCHE",
-        anesthesiologist: "Patricia",
-        title: "Cubierto",
+        title: "Turno externo",
       }),
     )
     const result = await response.json()
