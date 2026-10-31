@@ -16,7 +16,7 @@ import {
 } from "lucide-react"
 import { DebtSummaryCard } from "@/components/debt/DebtSummaryCard"
 import { PageHeading } from "@/components/dashboard/PageHeading"
-import { findScheduleConflicts, somaShiftWindows } from "@/lib/calendar/availability"
+import { findScheduleConflicts, getUpcomingMonthConflicts, somaShiftWindows } from "@/lib/calendar/availability"
 import {
   formatLongDate,
   getEntryLabel,
@@ -59,7 +59,11 @@ export function DashboardOverview() {
   const todayShiftCount = getMonthSomaShiftCount(todaySomaEntries, activeDate)
   const todayShiftHours = getMonthShiftHours(todaySomaEntries, activeDate)
   const todayEventCount = todayEntries.filter((entry) => entry.kind === "SEDARTE" || entry.kind === "PERSONAL").length
-  const scheduleConflicts = findScheduleConflicts(entries, somaShiftWindows)
+  const scheduleConflicts = getUpcomingMonthConflicts(
+    findScheduleConflicts(entries, somaShiftWindows),
+    activeMonth,
+    todayKey,
+  )
   const entriesById = new Map(entries.map((entry) => [entry.id, entry]))
   const upcomingEntries = entries
     .filter((entry) => isUpcomingCalendarEntry(entry, todayKey, currentMinute))

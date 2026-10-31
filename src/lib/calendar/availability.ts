@@ -189,3 +189,7 @@ export function findScheduleConflicts(entries: CalendarEntry[], windows: ShiftWi
 
   return result
 }
+
+export function getUpcomingMonthConflicts(conflicts: ScheduleConflict[], month: string, today: string) {
+  return conflicts.filter((conflict) => conflict.date >= today && conflict.date.slice(0, 7) === month)
+}

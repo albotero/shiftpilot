@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest"
-import { findScheduleConflicts, getDayAvailability, somaShiftWindows } from "@/lib/calendar/availability"
+import {
+  findScheduleConflicts,
+  getDayAvailability,
+  getUpcomingMonthConflicts,
+  somaShiftWindows,
+} from "@/lib/calendar/availability"
 import {
   getCalendarEntryStartMinute,
   getEntryLabel,
@@ -22,6 +27,16 @@ const reservedShift: CalendarEntry = {
 }
 
 describe("calendar availability", () => {
+  it("keeps only current-month conflicts that have not passed for dashboard display", () => {
+    const conflicts = [
+      { date: "2026-10-01", firstEntryId: "a", secondEntryId: "b", type: "HORARIO" as const },
+      { date: "2026-10-30", firstEntryId: "c", secondEntryId: "d", type: "VACACIONES" as const },
+      { date: "2026-11-01", firstEntryId: "e", secondEntryId: "f", type: "HORARIO" as const },
+    ]
+
+    expect(getUpcomingMonthConflicts(conflicts, "2026-10", "2026-10-27")).toEqual([conflicts[1]])
+  })
+
   it.each([
     ["09:59", 1],
     ["10:00", 0],
