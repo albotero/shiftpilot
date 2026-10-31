@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { parseInvoicePdfText } from "./pdf-import"
+import { parseCreditNotePdfText, parseInvoicePdfText } from "./pdf-import"
 
 const oneItemInvoice = `
 Factura electronica de venta
@@ -18,6 +18,7 @@ describe("invoice PDF import parser", () => {
   it("parses the invoice number, dates, type, one item, and COP amounts in thousands", () => {
     expect(parseInvoicePdfText(oneItemInvoice)).toEqual({
       invoiceNumber: "SF177",
+      institutionName: "SEDARTE IPS SAS",
       type: "SEDARTE",
       serviceDate: "2026-10-05",
       invoiceDate: "2026-10-05",
@@ -57,6 +58,12 @@ describe("invoice PDF import parser", () => {
         { description: "SERVICIO B - 1/09/2026 08:00", quantity: 2, unitAmount: 200, discountAmount: 0 },
       ],
     })
+  })
+
+  it("parses an expiration date split into separate PDF fragments", () => {
+    const text = oneItemInvoice.replace("Vencimiento 05/10/2026", "Vencimiento\n31 / 01 / 2028")
+
+    expect(parseInvoicePdfText(text).expectedPaymentDate).toBe("2028-01-31")
   })
 
   it("converts ordinary COP pesos to app thousands for a fully discounted SOMA POS invoice", () => {
@@ -120,5 +127,65 @@ describe("invoice PDF import parser", () => {
     `
 
     expect(() => parseInvoicePdfText(text)).toThrow(/total a pagar/i)
+  })
+
+  it("parses a credit note changing payment terms without treating it as an invoice cancellation", () => {
+    const text = `
+      Alejandro Botero
+      Nota Crédito No. 2-3
+      Fecha Nota Crédito 2026-10-30
+      Factura de Venta SF-181
+      Señores SOCIEDAD MEDICA ANTIOQUEÑA SA
+      1 SERVICIOS ANESTESIOLOGIA POS - OCTUBRE 2026 1.00 25,939,738.00
+      Total Bruto 42,709,929.00
+      Descuentos 16,770,191.00
+      Total 25,939,738.00
+      Observaciones: Cambio de forma de pago
+      CUDE: 123abc
+    `
+
+    expect(parseCreditNotePdfText(text)).toEqual({
+      creditNoteNumber: "2-3",
+      originalInvoiceNumber: "SF-181",
+      creditNoteDate: "2026-10-30",
+      reason: "Cambio de forma de pago",
+      amount: 25939.738,
+    })
+    expect(() => parseInvoicePdfText(text)).toThrow(/nota crédito/i)
+  })
+
+  it("parses credit-note identifiers and total split across PDF lines", () => {
+    const text = `
+      Nota Crédito
+      No. 2- 3
+      Fecha Nota Crédito 2026-10-30
+      Factura de Venta
+      SF - 181
+      Total items: 1
+      Total Bruto 42,709,929.00
+      Total
+      25,939,738.00
+      Observaciones: Cambio de forma de pago
+    `
+
+    expect(parseCreditNotePdfText(text)).toMatchObject({
+      creditNoteNumber: "2-3",
+      originalInvoiceNumber: "SF-181",
+      amount: 25939.738,
+    })
+  })
+
+  it("finds the final Total when the PDF places all summary amounts on one line", () => {
+    const text = `
+      Nota Crédito No. 2-3
+      Factura de Venta SF-181
+      Total items: 1 · Total Bruto 42,709,929.00 · Descuentos 16,770,191.00 · Subtotal 25,939,738.00 · IVA 0.00 · Total 25,939,738.00
+    `
+
+    expect(parseCreditNotePdfText(text)).toMatchObject({
+      creditNoteNumber: "2-3",
+      originalInvoiceNumber: "SF-181",
+      amount: 25939.738,
+    })
   })
 })

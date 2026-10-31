@@ -1,0 +1,5 @@
+ALTER TYPE "InvoiceStatus" ADD VALUE 'ANULADA';
+
+ALTER TABLE "Invoice"
+ADD COLUMN "institutionName" VARCHAR(160),
+ADD COLUMN "creditNotes" JSONB NOT NULL DEFAULT '[]';

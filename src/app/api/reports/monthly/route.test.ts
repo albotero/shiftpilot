@@ -55,6 +55,7 @@ describe("monthly reports route", () => {
           gte: new Date("2026-10-01T00:00:00.000Z"),
           lt: new Date("2026-11-01T00:00:00.000Z"),
         },
+        status: { not: "ANULADA" },
       },
       select: { netAmount: true },
     })

@@ -10,7 +10,7 @@ import {
 import { addMoney, assertMoneyAmount, roundMoneyAmount, subtractMoney } from "@/lib/money/integer"
 
 export const invoiceTypes = ["SOMA_POS", "SOMA_PREPAGADA", "SOMA_PARTICULAR", "SEDARTE"] as const
-export const invoiceStatuses = ["PENDIENTE", "FACTURADA", "POR_COBRAR", "PAGADA", "VENCIDA"] as const
+export const invoiceStatuses = ["PENDIENTE", "FACTURADA", "POR_COBRAR", "PAGADA", "VENCIDA", "ANULADA"] as const
 
 function moneyAmountSchema() {
   return z
@@ -38,6 +38,7 @@ export const invoiceMutationSchema = z
     serviceDate: z.iso.date(),
     invoiceDate: z.union([z.iso.date(), z.null()]).optional(),
     invoiceNumber: z.string().trim().max(64).nullable().optional(),
+    institutionName: z.string().trim().max(160).nullable().optional(),
     expectedPaymentDate: z.union([z.iso.date(), z.null()]).optional(),
     pdfTotalAmount: moneyAmountSchema().nullable().optional(),
     includeInIbc: z.boolean().optional(),
@@ -66,7 +67,7 @@ export const invoiceMutationSchema = z
     if (invoice.status === "PAGADA" && !invoice.paidAt) {
       context.addIssue({ code: "custom", message: "Indica la fecha de pago", path: ["paidAt"] })
     }
-    if (invoice.status !== "PAGADA" && invoice.paidAt) {
+    if (invoice.status !== "PAGADA" && invoice.status !== "ANULADA" && invoice.paidAt) {
       context.addIssue({ code: "custom", message: "La fecha de pago requiere estado PAGADA", path: ["paidAt"] })
     }
   })

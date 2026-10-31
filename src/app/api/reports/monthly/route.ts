@@ -30,7 +30,7 @@ export async function GET(request: Request) {
         select: { status: true, period: true, durationHours: true, coverages: { select: { id: true } } },
       }),
       prisma.invoice.findMany({
-        where: { serviceDate: { gte: range.start, lt: range.end } },
+        where: { serviceDate: { gte: range.start, lt: range.end }, status: { not: "ANULADA" } },
         select: { netAmount: true },
       }),
       prisma.socialSecurityPeriod.findUnique({

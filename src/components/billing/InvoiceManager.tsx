@@ -1,9 +1,9 @@
 "use client"
 
-import { useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react"
+import { Fragment, useEffect, useRef, useState, type ChangeEvent, type FormEvent } from "react"
 import { format } from "date-fns"
 import { es } from "date-fns/locale"
-import { FilePlus2, FileUp, Pencil, Plus, Trash2, X } from "lucide-react"
+import { FilePlus2, FileUp, Pencil, Plus, Save, Trash2, X } from "lucide-react"
 import { DateInput } from "@/components/forms/DateInput"
 import { MoneyInput } from "@/components/forms/MoneyInput"
 import { DEFAULT_BILLING_SETTINGS, type BillingSettings } from "@/lib/billing/calculations"
@@ -15,7 +15,9 @@ import {
   invoiceMutationSchema,
   type InvoiceMutation,
 } from "@/lib/billing/invoice-service"
-import { parseInvoicePdfText } from "@/lib/billing/pdf-import"
+import { parseCreditNotePdfText, parseInvoicePdfText, type ImportedCreditNote } from "@/lib/billing/pdf-import"
+import { isInstitutionIncludedInIbc } from "@/lib/billing/ibc-institutions"
+import { normalizeInvoiceNumber } from "@/lib/billing/invoice-identifiers"
 
 type InvoiceType = InvoiceMutation["type"]
 type InvoiceStatus = InvoiceMutation["status"]
@@ -27,6 +29,7 @@ type InvoiceRecord = {
   serviceDate: string
   invoiceDate: string | null
   invoiceNumber: string | null
+  institutionName: string | null
   expectedPaymentDate: string | null
   pdfTotalAmount: number | null
   grossAmount: number
@@ -39,14 +42,31 @@ type InvoiceRecord = {
   status: InvoiceStatus
   paidAt: string | null
   notes: string | null
+  creditNotes: {
+    number: string
+    date: string | null
+    reason: string
+    amount: number
+    action: "ANULACION" | "MODIFICACION"
+    resultingAmount?: number
+  }[]
   items: (InvoiceItem & { id: string })[]
 }
 
 type InvoiceSummary = { count: number; netAmount: number }
+type CreditNoteDraft = {
+  invoiceId: string | null
+  originalInvoiceNumber: string
+  creditNoteNumber: string
+  creditNoteDate: string
+  reason: string
+  amount: string
+}
 type InvoiceResponse = {
   invoices: InvoiceRecord[]
   calculationSettings: BillingSettings
   paymentDays: Record<InvoiceType, number>
+  includedIbcInstitutions: string[]
   summary: InvoiceSummary
 }
 type ItemDraft = { key: string; description: string; quantity: string; unitAmount: string; discountAmount: string }
@@ -107,9 +127,13 @@ export function InvoiceManager({
   const [serviceDate, setServiceDate] = useState(`${month}-01`)
   const [invoiceDate, setInvoiceDate] = useState("")
   const [invoiceNumber, setInvoiceNumber] = useState("")
+  const [institutionName, setInstitutionName] = useState("")
+  const [knownInstitutions, setKnownInstitutions] = useState<string[]>([])
+  const [includedIbcInstitutions, setIncludedIbcInstitutions] = useState<string[]>([])
   const [expectedPaymentDateOverride, setExpectedPaymentDateOverride] = useState("")
   const [shiftDiscountAmount, setShiftDiscountAmount] = useState("0")
   const [includeInIbc, setIncludeInIbc] = useState(false)
+  const [includeInIbcManuallySet, setIncludeInIbcManuallySet] = useState(false)
   const [privateShiftCount, setPrivateShiftCount] = useState("0")
   const [notes, setNotes] = useState("")
   const [items, setItems] = useState<ItemDraft[]>([createItem()])
@@ -118,6 +142,10 @@ export function InvoiceManager({
   const [savingIbcId, setSavingIbcId] = useState<string | null>(null)
   const [pdfImporting, setPdfImporting] = useState(false)
   const [pdfReportedTotal, setPdfReportedTotal] = useState<number | null>(null)
+  const [pendingCreditNote, setPendingCreditNote] = useState<ImportedCreditNote | null>(null)
+  const [applyingCreditNote, setApplyingCreditNote] = useState(false)
+  const [creditNoteDraft, setCreditNoteDraft] = useState<CreditNoteDraft | null>(null)
+  const [savingCreditNote, setSavingCreditNote] = useState(false)
   const [error, setError] = useState("")
   const [message, setMessage] = useState("")
   const pdfInputRef = useRef<HTMLInputElement>(null)
@@ -133,6 +161,7 @@ export function InvoiceManager({
         setInvoices(data.invoices)
         setCalculationSettings(data.calculationSettings)
         setPaymentDays(data.paymentDays)
+        setIncludedIbcInstitutions(data.includedIbcInstitutions ?? [])
         onSummaryChange(data.summary)
         setLoadedMonth(month)
       })
@@ -147,6 +176,19 @@ export function InvoiceManager({
     }
   }, [month, onSummaryChange, refreshToken])
 
+  useEffect(() => {
+    const controller = new AbortController()
+    fetch("/api/invoices/ibc-settings", { cache: "no-store", signal: controller.signal })
+      .then(async (response) => {
+        const result = (await response.json()) as { institutions?: string[]; includedInstitutions?: string[] }
+        if (!response.ok || controller.signal.aborted) return
+        setKnownInstitutions(result.institutions ?? [])
+        setIncludedIbcInstitutions(result.includedInstitutions ?? [])
+      })
+      .catch(() => {})
+    return () => controller.abort()
+  }, [refreshToken])
+
   const effectiveServiceDate = invoiceDate || (editingId ? serviceDate : `${month}-01`)
   const payload = {
     ...(editingId ? { id: editingId } : {}),
@@ -154,10 +196,11 @@ export function InvoiceManager({
     serviceDate: effectiveServiceDate,
     invoiceDate: invoiceDate || null,
     invoiceNumber: invoiceNumber.trim() || null,
+    institutionName: institutionName.trim() || null,
     expectedPaymentDate: expectedPaymentDateOverride || null,
     pdfTotalAmount: pdfReportedTotal,
     status: editingId ? storedStatus : "FACTURADA",
-    includeInIbc,
+    includeInIbc: editingId || includeInIbcManuallySet ? includeInIbc : undefined,
     paidAt: editingId && storedStatus === "PAGADA" ? storedPaidAt || null : null,
     shiftDiscountAmount: type === "SOMA_POS" ? Number(shiftDiscountAmount) : 0,
     privateShiftCount: type === "SOMA_PARTICULAR" ? Number(privateShiftCount) : 0,
@@ -202,14 +245,17 @@ export function InvoiceManager({
     setServiceDate(`${month}-01`)
     setInvoiceDate("")
     setInvoiceNumber("")
+    setInstitutionName("")
     setExpectedPaymentDateOverride("")
     setShiftDiscountAmount("0")
     setIncludeInIbc(false)
+    setIncludeInIbcManuallySet(false)
     setPrivateShiftCount("0")
     setNotes("")
     setItems([createItem()])
     setEditingId(null)
     setPdfReportedTotal(null)
+    setPendingCreditNote(null)
   }
 
   function editInvoice(invoice: InvoiceRecord) {
@@ -220,9 +266,11 @@ export function InvoiceManager({
     setServiceDate(invoice.serviceDate)
     setInvoiceDate(invoice.invoiceDate ?? "")
     setInvoiceNumber(invoice.invoiceNumber ?? "")
+    setInstitutionName(invoice.institutionName ?? "")
     setExpectedPaymentDateOverride(invoice.expectedPaymentDate ?? "")
     setPdfReportedTotal(invoice.pdfTotalAmount)
     setIncludeInIbc(invoice.includeInIbc)
+    setIncludeInIbcManuallySet(true)
     setShiftDiscountAmount(String(invoice.shiftDiscountAmount))
     setPrivateShiftCount(String(invoice.privateShiftCount))
     setNotes(invoice.notes ?? "")
@@ -237,6 +285,7 @@ export function InvoiceManager({
     )
     setError("")
     setMessage("")
+    setPendingCreditNote(null)
   }
 
   async function importPdf(event: ChangeEvent<HTMLInputElement>) {
@@ -247,14 +296,42 @@ export function InvoiceManager({
     setError("")
     setMessage("")
     try {
-      const imported = parseInvoicePdfText(await extractInvoiceTextFromPdf(file))
-      setEditingId(null)
-      setIncludeInIbc(false)
-      setInvoiceNumber(imported.invoiceNumber ?? "")
-      if (imported.type) setType(imported.type)
-      setInvoiceDate(imported.invoiceDate ?? imported.serviceDate ?? "")
-      setExpectedPaymentDateOverride(imported.expectedPaymentDate ?? "")
-      setServiceDate(imported.serviceDate ?? imported.invoiceDate ?? `${month}-01`)
+      const extractedText = await extractInvoiceTextFromPdf(file)
+      const creditNote = parseCreditNotePdfText(extractedText)
+      if (creditNote) {
+        setPendingCreditNote(creditNote)
+        setMessage(
+          `Nota crédito ${creditNote.creditNoteNumber} lista para asociar a la factura ${creditNote.originalInvoiceNumber}.`,
+        )
+        return
+      }
+      const imported = parseInvoicePdfText(extractedText)
+      let existingInvoice: InvoiceRecord | undefined
+      if (imported.invoiceNumber) {
+        const response = await fetch(`/api/invoices?number=${encodeURIComponent(imported.invoiceNumber)}`, {
+          cache: "no-store",
+        })
+        const result = await response.json()
+        if (!response.ok) throw new Error(result.error ?? "No se pudo comprobar si la factura ya existe.")
+        existingInvoice = (result as InvoiceRecord[]).find(
+          (invoice) =>
+            normalizeInvoiceNumber(invoice.invoiceNumber ?? "") === normalizeInvoiceNumber(imported.invoiceNumber!),
+        )
+      }
+      setEditingId(existingInvoice?.id ?? null)
+      setStoredStatus(existingInvoice?.status ?? "FACTURADA")
+      setStoredPaidAt(existingInvoice?.paidAt ?? "")
+      setPendingCreditNote(null)
+      setInstitutionName(imported.institutionName ?? existingInvoice?.institutionName ?? "")
+      setIncludeInIbc(
+        existingInvoice?.includeInIbc ?? isInstitutionIncludedInIbc(imported.institutionName, includedIbcInstitutions),
+      )
+      setIncludeInIbcManuallySet(Boolean(existingInvoice))
+      setInvoiceNumber(imported.invoiceNumber ?? existingInvoice?.invoiceNumber ?? "")
+      setType(imported.type ?? existingInvoice?.type ?? "SOMA_POS")
+      setInvoiceDate(imported.invoiceDate ?? imported.serviceDate ?? existingInvoice?.invoiceDate ?? "")
+      setExpectedPaymentDateOverride(imported.expectedPaymentDate ?? existingInvoice?.expectedPaymentDate ?? "")
+      setServiceDate(imported.serviceDate ?? imported.invoiceDate ?? existingInvoice?.serviceDate ?? `${month}-01`)
       setItems(
         imported.items.map((item) => ({
           key: createItem().key,
@@ -265,18 +342,147 @@ export function InvoiceManager({
         })),
       )
       setShiftDiscountAmount("0")
-      setPrivateShiftCount("0")
+      setPrivateShiftCount(String(existingInvoice?.privateShiftCount ?? 0))
+      setNotes(existingInvoice?.notes ?? "")
       setPdfReportedTotal(imported.pdfTotalAmount)
       const serviceMonth = (imported.serviceDate ?? imported.invoiceDate)?.slice(0, 7)
       if (serviceMonth) onMonthChange(serviceMonth)
       setMessage(
-        `PDF leído: ${imported.items.length} partida${imported.items.length === 1 ? "" : "s"}. Revisa los datos antes de guardar.`,
+        existingInvoice
+          ? `Factura ${existingInvoice.invoiceNumber} encontrada. Revisa los datos y guarda para actualizarla.`
+          : `PDF leído: ${imported.items.length} partida${imported.items.length === 1 ? "" : "s"}. Revisa los datos antes de guardar.`,
       )
     } catch (importError) {
       setError(errorMessage(importError, "No se pudo leer la factura. Usa un PDF con texto seleccionable."))
     } finally {
       setPdfImporting(false)
       input.value = ""
+    }
+  }
+
+  async function applyCreditNote() {
+    if (!pendingCreditNote) return
+    setApplyingCreditNote(true)
+    setError("")
+    setMessage("")
+    try {
+      const response = await fetch("/api/invoices/credit-note", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(pendingCreditNote),
+      })
+      const result = (await response.json()) as { serviceDate?: string; action?: string; error?: string }
+      if (!response.ok) throw new Error(result.error ?? "No se pudo aplicar la nota crédito.")
+      setPendingCreditNote(null)
+      setMessage(
+        result.action === "ANULACION"
+          ? "Factura anulada; la nota crédito quedó registrada."
+          : "Factura modificada; la nota crédito quedó registrada sin alterar sus valores.",
+      )
+      if (result.serviceDate) onMonthChange(result.serviceDate.slice(0, 7))
+      setRefreshToken((value) => value + 1)
+      onInvoicesChanged()
+    } catch (applyError) {
+      setError(errorMessage(applyError, "No se pudo aplicar la nota crédito."))
+    } finally {
+      setApplyingCreditNote(false)
+    }
+  }
+
+  function startNewCreditNote() {
+    setError("")
+    setMessage("")
+    setCreditNoteDraft({
+      invoiceId: null,
+      originalInvoiceNumber: "",
+      creditNoteNumber: "",
+      creditNoteDate: format(new Date(), "yyyy-MM-dd"),
+      reason: "",
+      amount: "",
+    })
+  }
+
+  function editCreditNote(invoice: InvoiceRecord, note: InvoiceRecord["creditNotes"][number]) {
+    setError("")
+    setMessage("")
+    setCreditNoteDraft({
+      invoiceId: invoice.id,
+      originalInvoiceNumber: invoice.invoiceNumber ?? "",
+      creditNoteNumber: note.number,
+      creditNoteDate: note.date ?? "",
+      reason: note.reason,
+      amount: String(note.amount),
+    })
+  }
+
+  async function saveCreditNote(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    if (!creditNoteDraft) return
+    const amount = Number(creditNoteDraft.amount)
+    if (!Number.isFinite(amount) || amount <= 0 || Math.abs(amount * 1000 - Math.round(amount * 1000)) >= 0.000001) {
+      setError("Indica un valor positivo con máximo tres decimales en miles COP.")
+      return
+    }
+    setSavingCreditNote(true)
+    setError("")
+    setMessage("")
+    try {
+      const editing = creditNoteDraft.invoiceId !== null
+      const response = await fetch("/api/invoices/credit-note", {
+        method: editing ? "PATCH" : "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...(editing
+            ? { invoiceId: creditNoteDraft.invoiceId }
+            : { originalInvoiceNumber: creditNoteDraft.originalInvoiceNumber }),
+          creditNoteNumber: creditNoteDraft.creditNoteNumber,
+          creditNoteDate: creditNoteDraft.creditNoteDate || null,
+          reason: creditNoteDraft.reason,
+          amount,
+        }),
+      })
+      const result = (await response.json()) as { serviceDate?: string; action?: string; error?: string }
+      if (!response.ok) throw new Error(result.error ?? "No se pudo guardar la nota crédito.")
+      setCreditNoteDraft(null)
+      setMessage(
+        result.action === "ANULACION"
+          ? "Factura anulada; la nota crédito quedó registrada."
+          : editing
+            ? "Nota crédito modificada y factura recalculada."
+            : "Nota crédito creada y asociada a la factura.",
+      )
+      if (result.serviceDate) onMonthChange(result.serviceDate.slice(0, 7))
+      setRefreshToken((value) => value + 1)
+      onInvoicesChanged()
+    } catch (saveError) {
+      setError(errorMessage(saveError, "No se pudo guardar la nota crédito."))
+    } finally {
+      setSavingCreditNote(false)
+    }
+  }
+
+  async function deleteCreditNote(invoice: InvoiceRecord, note: InvoiceRecord["creditNotes"][number]) {
+    if (!window.confirm(`¿Eliminar la nota crédito ${note.number} y recalcular la factura?`)) return
+    setError("")
+    setMessage("")
+    try {
+      const response = await fetch("/api/invoices/credit-note", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ invoiceId: invoice.id, creditNoteNumber: note.number }),
+      })
+      const result = (await response.json()) as { serviceDate?: string; status?: string; error?: string }
+      if (!response.ok) throw new Error(result.error ?? "No se pudo eliminar la nota crédito.")
+      setMessage(
+        result.status === "ANULADA"
+          ? "Nota eliminada; la factura sigue anulada."
+          : "Nota eliminada y factura recalculada.",
+      )
+      if (result.serviceDate) onMonthChange(result.serviceDate.slice(0, 7))
+      setRefreshToken((value) => value + 1)
+      onInvoicesChanged()
+    } catch (deleteError) {
+      setError(errorMessage(deleteError, "No se pudo eliminar la nota crédito."))
     }
   }
 
@@ -343,9 +549,7 @@ export function InvoiceManager({
       const result = await response.json()
       if (!response.ok) throw new Error(result.error ?? "No se pudo actualizar la inclusión en el IBC.")
       const updatedInvoice = result as InvoiceRecord
-      setInvoices((current) =>
-        current.map((item) => (item.id === updatedInvoice.id ? updatedInvoice : item)),
-      )
+      setInvoices((current) => current.map((item) => (item.id === updatedInvoice.id ? updatedInvoice : item)))
       if (editingId === invoice.id) setIncludeInIbc(updatedInvoice.includeInIbc)
       setMessage(
         updatedInvoice.includeInIbc
@@ -382,8 +586,127 @@ export function InvoiceManager({
           >
             <FileUp size={15} /> {pdfImporting ? "Leyendo PDF…" : "Importar PDF"}
           </button>
+          <button type="button" className="invoice-secondary-button" onClick={startNewCreditNote}>
+            <Plus size={14} /> Nueva nota crédito
+          </button>
         </div>
       </div>
+
+      {creditNoteDraft && (
+        <form className="manual-credit-note-form" onSubmit={saveCreditNote}>
+          <div className="manual-credit-note-heading">
+            <div>
+              <p className="eyebrow">Ajuste de facturación</p>
+              <h3>
+                {creditNoteDraft.invoiceId ? `Editar nota ${creditNoteDraft.creditNoteNumber}` : "Nueva nota crédito"}
+              </h3>
+            </div>
+            <button
+              type="button"
+              className="icon-button"
+              aria-label="Cerrar formulario de nota crédito"
+              disabled={savingCreditNote}
+              onClick={() => setCreditNoteDraft(null)}
+            >
+              <X size={16} />
+            </button>
+          </div>
+          <div className="manual-credit-note-fields">
+            <label className="form-field">
+              <span>Factura original</span>
+              <input
+                required
+                maxLength={64}
+                value={creditNoteDraft.originalInvoiceNumber}
+                disabled={creditNoteDraft.invoiceId !== null}
+                onChange={(event) =>
+                  setCreditNoteDraft((current) => current && { ...current, originalInvoiceNumber: event.target.value })
+                }
+                placeholder="Ej. SF-181"
+              />
+            </label>
+            <label className="form-field">
+              <span>Número de nota crédito</span>
+              <input
+                required
+                maxLength={64}
+                value={creditNoteDraft.creditNoteNumber}
+                disabled={creditNoteDraft.invoiceId !== null}
+                onChange={(event) =>
+                  setCreditNoteDraft((current) => current && { ...current, creditNoteNumber: event.target.value })
+                }
+              />
+            </label>
+            <label className="form-field">
+              <span>Fecha</span>
+              <input
+                type="date"
+                value={creditNoteDraft.creditNoteDate}
+                onChange={(event) =>
+                  setCreditNoteDraft((current) => current && { ...current, creditNoteDate: event.target.value })
+                }
+              />
+            </label>
+            <label className="form-field">
+              <span>Valor · miles COP</span>
+              <MoneyInput
+                required
+                value={creditNoteDraft.amount}
+                onValueChange={(amount) => setCreditNoteDraft((current) => current && { ...current, amount })}
+              />
+            </label>
+            <label className="form-field manual-credit-note-reason">
+              <span>Observación · opcional</span>
+              <input
+                maxLength={400}
+                value={creditNoteDraft.reason}
+                onChange={(event) =>
+                  setCreditNoteDraft((current) => current && { ...current, reason: event.target.value })
+                }
+                placeholder="Motivo o cambio realizado"
+              />
+            </label>
+          </div>
+          <div className="manual-credit-note-footer">
+            <p>Si el valor coincide con el neto pendiente, la factura se anula; si es parcial, se modifica.</p>
+            <div className="invoice-form-actions">
+              <button
+                type="button"
+                className="cancel-button"
+                onClick={() => setCreditNoteDraft(null)}
+                disabled={savingCreditNote}
+              >
+                Cancelar
+              </button>
+              <button type="submit" className="submit-button" disabled={savingCreditNote}>
+                <Save size={15} />{" "}
+                {savingCreditNote ? "Guardando…" : creditNoteDraft.invoiceId ? "Guardar nota" : "Crear nota crédito"}
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
+
+      {pendingCreditNote && (
+        <div className="invoice-credit-note-notice" role="status">
+          <div>
+            <strong>Nota crédito {pendingCreditNote.creditNoteNumber}</strong>
+            <span>
+              Factura {pendingCreditNote.originalInvoiceNumber} · {pendingCreditNote.reason || "Sin observación"} ·{" "}
+              {formatAmount(pendingCreditNote.amount)} mil COP
+            </span>
+            <small>Se anulará si su valor coincide con el neto original; si difiere, quedará como modificación.</small>
+          </div>
+          <button
+            type="button"
+            className="submit-button"
+            onClick={() => void applyCreditNote()}
+            disabled={applyingCreditNote}
+          >
+            {applyingCreditNote ? "Aplicando…" : "Aplicar nota crédito"}
+          </button>
+        </div>
+      )}
 
       <form className="invoice-form" onSubmit={saveInvoice}>
         <div className="invoice-form-grid">
@@ -392,14 +715,27 @@ export function InvoiceManager({
             <input maxLength={64} value={invoiceNumber} onChange={(event) => setInvoiceNumber(event.target.value)} />
           </label>
           <label className="form-field">
-            <span>Tipo de factura</span>
-            <select value={type} onChange={(event) => setType(event.target.value as InvoiceType)}>
-              {Object.entries(typeLabels).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
+            <span>Entidad</span>
+            <input
+              list="invoice-institution-options"
+              autoComplete="off"
+              maxLength={160}
+              required
+              value={institutionName}
+              onChange={(event) => {
+                const nextName = event.target.value
+                setInstitutionName(nextName)
+                if (!editingId) {
+                  setIncludeInIbc(isInstitutionIncludedInIbc(nextName, includedIbcInstitutions))
+                  setIncludeInIbcManuallySet(false)
+                }
+              }}
+            />
+            <datalist id="invoice-institution-options">
+              {knownInstitutions.map((institution) => (
+                <option key={institution} value={institution} />
               ))}
-            </select>
+            </datalist>
           </label>
           <div className="form-field">
             <label htmlFor="invoice-expedition-date">Expedición</label>
@@ -544,7 +880,10 @@ export function InvoiceManager({
           <input
             type="checkbox"
             checked={includeInIbc}
-            onChange={(event) => setIncludeInIbc(event.target.checked)}
+            onChange={(event) => {
+              setIncludeInIbc(event.target.checked)
+              setIncludeInIbcManuallySet(true)
+            }}
           />
           <span>
             <strong>Incluir en el cálculo del IBC</strong>
@@ -630,51 +969,114 @@ export function InvoiceManager({
                 <th>Factura</th>
                 <th>Institución o unidad</th>
                 <th>Factura / vence</th>
-                <th className="amount-column">Neto</th>
+                <th className="amount-column">Importes · miles COP</th>
                 <th>IBC</th>
+                <th>Estado</th>
                 <th />
               </tr>
             </thead>
             <tbody>
               {invoices.map((invoice) => (
-                <tr key={invoice.id}>
-                  <td>{invoice.invoiceNumber ?? "—"}</td>
-                  <td>{typeLabels[invoice.type]}</td>
-                  <td>
-                    {formatDate(invoice.invoiceDate)} / {formatDate(invoice.expectedPaymentDate)}
-                  </td>
-                  <td className="amount-column">{formatAmount(invoice.netAmount)}</td>
-                  <td>
-                    <label className="invoice-ibc-toggle">
-                      <input
-                        type="checkbox"
-                        aria-label={`${invoice.includeInIbc ? "Excluir" : "Incluir"} ${typeLabels[invoice.type]} ${invoice.invoiceNumber ?? ""} en el cálculo del IBC`}
-                        checked={invoice.includeInIbc}
-                        disabled={savingIbcId !== null}
-                        onChange={() => void toggleInvoiceIbc(invoice)}
-                      />
-                      <span>{invoice.includeInIbc ? "Incluir" : "Excluida"}</span>
-                    </label>
-                  </td>
-                  <td className="invoice-row-actions">
-                    <button
-                      type="button"
-                      className="icon-button"
-                      aria-label={`Editar ${typeLabels[invoice.type]}`}
-                      onClick={() => editInvoice(invoice)}
-                    >
-                      <Pencil size={14} />
-                    </button>
-                    <button
-                      type="button"
-                      className="icon-button invoice-delete-button"
-                      aria-label={`Eliminar ${typeLabels[invoice.type]}`}
-                      onClick={() => void deleteInvoice(invoice)}
-                    >
-                      <Trash2 size={14} />
-                    </button>
-                  </td>
-                </tr>
+                <Fragment key={invoice.id}>
+                  <tr className="invoice-main-row">
+                    <td className="invoice-number-cell">{invoice.invoiceNumber ?? "—"}</td>
+                    <td className="invoice-entity-cell">{invoice.institutionName || typeLabels[invoice.type]}</td>
+                    <td className="invoice-dates-cell">
+                      {formatDate(invoice.invoiceDate)} / {formatDate(invoice.expectedPaymentDate)}
+                    </td>
+                    <td className="amount-column invoice-amounts-cell">
+                      <div className="invoice-money-lines invoice-table-money-lines">
+                        <div className="invoice-money-before-net">
+                          <span className="invoice-money-billed">Facturado {formatAmount(invoice.grossAmount)}</span>
+                          <span className="invoice-money-separator" aria-hidden="true">
+                            ·
+                          </span>
+                          <span className="invoice-money-discount">
+                            Descuentos {formatAmount(addMoney(invoice.discountAmount, invoice.shiftDiscountAmount))}
+                          </span>
+                        </div>
+                        <strong className="invoice-money-net">Neto {formatAmount(invoice.netAmount)}</strong>
+                      </div>
+                    </td>
+                    <td className="invoice-ibc-cell">
+                      <label className="invoice-ibc-toggle">
+                        <input
+                          type="checkbox"
+                          aria-label={`${invoice.includeInIbc ? "Excluir" : "Incluir"} ${typeLabels[invoice.type]} ${invoice.invoiceNumber ?? ""} en el cálculo del IBC`}
+                          checked={invoice.includeInIbc}
+                          disabled={savingIbcId !== null || invoice.status === "ANULADA"}
+                          onChange={() => void toggleInvoiceIbc(invoice)}
+                        />
+                        <span>{invoice.includeInIbc ? "Incluir" : "Excluida"}</span>
+                      </label>
+                    </td>
+                    <td className="invoice-status-cell">
+                      <span
+                        className={`invoice-status ${invoice.status === "ANULADA" ? "status-anulada" : `status-${invoice.status.toLowerCase()}`}`}
+                      >
+                        {invoice.status === "ANULADA"
+                          ? "Anulada"
+                          : invoice.creditNotes.length
+                            ? `Modificada · NC ${invoice.creditNotes.at(-1)?.number}`
+                            : invoice.status.replaceAll("_", " ")}
+                      </span>
+                    </td>
+                    <td className="invoice-row-actions-cell">
+                      <div className="invoice-row-actions">
+                        <button
+                          type="button"
+                          className="icon-button"
+                          aria-label={`Editar ${typeLabels[invoice.type]}`}
+                          onClick={() => editInvoice(invoice)}
+                        >
+                          <Pencil size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          className="icon-button invoice-delete-button"
+                          aria-label={`Eliminar ${typeLabels[invoice.type]}`}
+                          onClick={() => void deleteInvoice(invoice)}
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  {invoice.creditNotes.map((creditNote) => (
+                    <tr className="invoice-credit-note-row" key={`${invoice.id}-credit-${creditNote.number}`}>
+                      <td colSpan={6} className="invoice-credit-note-content-cell">
+                        <div>
+                          <strong>Nota crédito {creditNote.number}</strong>
+                          <span>
+                            {creditNote.date ? formatDate(creditNote.date) : "Sin fecha"} ·{" "}
+                            {creditNote.reason || "Sin observación"}
+                            {` · ${formatAmount(creditNote.amount)} mil COP · ${creditNote.action === "ANULACION" ? "Anula factura" : `Modifica neto a ${formatAmount(creditNote.resultingAmount ?? invoice.netAmount)} mil COP`}`}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="invoice-credit-note-actions-cell">
+                        <div className="invoice-row-actions invoice-credit-note-actions">
+                          <button
+                            type="button"
+                            className="icon-button"
+                            aria-label={`Editar nota crédito ${creditNote.number}`}
+                            onClick={() => editCreditNote(invoice, creditNote)}
+                          >
+                            <Pencil size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            className="icon-button invoice-delete-button"
+                            aria-label={`Eliminar nota crédito ${creditNote.number}`}
+                            onClick={() => void deleteCreditNote(invoice, creditNote)}
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>

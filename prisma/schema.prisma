@@ -69,6 +69,7 @@ enum InvoiceStatus {
   POR_COBRAR
   PAGADA
   VENCIDA
+  ANULADA
 }
 
 model Work {
@@ -238,6 +239,7 @@ model Invoice {
   serviceDate           DateTime     @db.Date
   invoiceDate           DateTime?    @db.Date
   invoiceNumber         String?      @db.VarChar(64)
+  institutionName       String?      @db.VarChar(160)
   expectedPaymentDate   DateTime?    @db.Date
   pdfTotalAmount        Decimal?     @db.Decimal(18, 3)
   grossAmount           Decimal      @db.Decimal(18, 3)
@@ -250,6 +252,7 @@ model Invoice {
   status                InvoiceStatus @default(PENDIENTE)
   paidAt                DateTime?    @db.Date
   notes                 String?
+  creditNotes           Json         @default("[]")
   items                 InvoiceItem[]
   createdAt             DateTime     @default(now())
   updatedAt             DateTime     @updatedAt

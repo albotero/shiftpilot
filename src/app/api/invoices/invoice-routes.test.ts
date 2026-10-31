@@ -227,6 +227,43 @@ describe("invoice routes", () => {
     )
   })
 
+  it("looks up invoices by number for safe PDF reimport without creating duplicates", async () => {
+    prismaMock.prisma.invoice.findMany.mockResolvedValue([
+      {
+        id: "invoice-original",
+        type: "SOMA_POS",
+        serviceDate: new Date("2026-10-01T00:00:00.000Z"),
+        invoiceDate: new Date("2026-10-01T00:00:00.000Z"),
+        invoiceNumber: "SF181",
+        institutionName: null,
+        expectedPaymentDate: new Date("2027-01-01T00:00:00.000Z"),
+        pdfTotalAmount: 1000,
+        grossAmount: 1200,
+        discountAmount: 200,
+        shiftDiscountAmount: 0,
+        netAmount: 1000,
+        includeInIbc: false,
+        privateShiftCount: 0,
+        privateShiftAmount: 0,
+        status: "FACTURADA",
+        paidAt: null,
+        notes: null,
+        creditNotes: [],
+        items: [],
+      },
+    ])
+
+    const response = await GET(new Request("http://localhost/api/invoices?number=SF-181"))
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject([{ id: "invoice-original", invoiceNumber: "SF181" }])
+    expect(prismaMock.prisma.invoice.findMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { invoiceNumber: { not: null } },
+      }),
+    )
+  })
+
   it("creates invoices excluded from IBC by default", async () => {
     prismaMock.prisma.invoice.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
       id: "invoice-excluded",
@@ -255,6 +292,41 @@ describe("invoice routes", () => {
     )
     expect(prismaMock.prisma.socialSecurityPeriod.upsert).toHaveBeenCalledWith(
       expect.objectContaining({ create: expect.objectContaining({ ibcAmount: 1_750.905 }) }),
+    )
+  })
+
+  it("includes a new invoice by default when its institution is configured for IBC", async () => {
+    prismaMock.prisma.appSetting.findMany.mockResolvedValue([
+      ...settings,
+      { key: "billing.ibc.includedInstitutions", value: ["Sociedad Médica Antioqueña S.A."] },
+    ])
+    prismaMock.prisma.invoice.create.mockImplementation(async ({ data }: { data: Record<string, unknown> }) => ({
+      id: "invoice-institution-ibc",
+      ...data,
+      invoiceDate: null,
+      expectedPaymentDate: new Date("2027-01-01T00:00:00.000Z"),
+      items: [],
+    }))
+
+    const response = await POST(
+      jsonRequest("POST", {
+        type: "SOMA_POS",
+        serviceDate: "2026-10-01",
+        institutionName: "SOCIEDAD MEDICA ANTIOQUEÑA SA",
+        status: "FACTURADA",
+        items: [{ description: "Servicio", quantity: 1, unitAmount: 1000 }],
+      }),
+    )
+
+    expect(response.status).toBe(201)
+    expect((await response.json()).includeInIbc).toBe(true)
+    expect(prismaMock.prisma.invoice.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          institutionName: "SOCIEDAD MEDICA ANTIOQUEÑA SA",
+          includeInIbc: true,
+        }),
+      }),
     )
   })
 

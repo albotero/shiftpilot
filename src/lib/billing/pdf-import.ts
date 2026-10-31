@@ -9,12 +9,21 @@ export type ImportedInvoiceItem = {
 
 export type ImportedInvoice = {
   invoiceNumber: string | null
+  institutionName: string | null
   type: ImportedInvoiceType | null
   serviceDate: string | null
   invoiceDate: string | null
   expectedPaymentDate: string | null
   pdfTotalAmount: number | null
   items: ImportedInvoiceItem[]
+}
+
+export type ImportedCreditNote = {
+  creditNoteNumber: string
+  originalInvoiceNumber: string
+  creditNoteDate: string | null
+  reason: string
+  amount: number
 }
 
 const amountPattern = String.raw`(?:\d{1,3}(?:,\d{3})+|\d+)\.\d{2}`
@@ -32,7 +41,12 @@ function amountInThousands(value: string) {
 
 function dateToIso(value: string | undefined) {
   if (!value) return null
-  const match = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/.exec(value)
+  const normalized = value.replace(/\s*([/.-])\s*/g, "$1")
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    const date = new Date(`${normalized}T00:00:00.000Z`)
+    return date.toISOString().slice(0, 10) === normalized ? normalized : null
+  }
+  const match = /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(normalized)
   if (!match) return null
   const [, day, month, year] = match
   const normalizedMonth = month.padStart(2, "0")
@@ -43,7 +57,8 @@ function dateToIso(value: string | undefined) {
 }
 
 function findDate(text: string, label: string) {
-  const match = new RegExp(`${label}\\s*:?\\s*(\\d{1,2}\\/\\d{1,2}\\/\\d{4})`, "i").exec(text)
+  const datePattern = String.raw`(\d{4}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{1,2}|\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{4})`
+  const match = new RegExp(`${label}\\s*:?\\s*${datePattern}`, "i").exec(text)
   return dateToIso(match?.[1])
 }
 
@@ -61,6 +76,9 @@ export function parseInvoicePdfText(sourceText: string): ImportedInvoice {
     .map((line) => line.replace(/\s+/g, " ").trim())
     .filter(Boolean)
   const text = lines.join("\n")
+  if (/nota\s+cr[eé]dito/i.test(text)) {
+    throw new Error("El PDF es una nota crédito. Impórtalo en el flujo de notas crédito.")
+  }
   const items = lines.flatMap((line) => {
     const match = invoiceItemPattern.exec(line)
     if (!match) return []
@@ -99,17 +117,52 @@ export function parseInvoicePdfText(sourceText: string): ImportedInvoice {
     .sort()
   const invoiceDate = findDate(text, "Expedición") ?? findDate(text, "Generación")
   const invoiceNumber = /\bNo\.?\s*([A-Z]{1,8}\s*-?\s*\d+)\b/i.exec(text)?.[1]?.replace(/\s+/g, "") ?? null
+  const institutionName = /^Señores\s+(.+)$/im.exec(text)?.[1]?.trim() ?? null
   const totalMatch = new RegExp(`Total\\s+a\\s+Pagar\\s*\\$?\\s*(${amountPattern})`, "i").exec(text)
   const pdfTotalAmount = totalMatch ? amountInThousands(totalMatch[1]) : null
   if (pdfTotalAmount === null) throw new Error("No se encontró el total a pagar de la factura.")
 
   return {
     invoiceNumber,
+    institutionName,
     type: findInvoiceType(text),
     serviceDate: invoiceDate ?? serviceDates[0] ?? null,
     invoiceDate,
     expectedPaymentDate: findDate(text, "Vencimiento"),
     pdfTotalAmount,
     items,
+  }
+}
+
+export function parseCreditNotePdfText(sourceText: string): ImportedCreditNote | null {
+  const text = sourceText
+    .split(/\r?\n/)
+    .map((line) => line.replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join("\n")
+  if (!/nota\s+cr[eé]dito/i.test(text)) return null
+
+  const creditNoteNumber =
+    /Nota\s+Cr[eé]dito[\s\S]{0,48}?\bNo\.?\s*([A-Z0-9]+(?:\s*-\s*[A-Z0-9]+)?)/i.exec(text)?.[1]?.replace(/\s+/g, "") ??
+    null
+  const originalInvoiceNumber =
+    /Factura\s+de\s+Venta\s+([A-Z0-9]+(?:\s*-\s*[A-Z0-9]+)?)/i.exec(text)?.[1]?.replace(/\s+/g, "") ?? null
+  const totalMatches = [
+    ...text.matchAll(/\bTotal(?!\s*(?:Bruto|items))\s*(?:a\s+pagar)?\s*:?\s*\$?\s*([\d,\s]+\.\s*\d{2})/gi),
+  ]
+  const total = totalMatches.at(-1)?.[1]?.replace(/\s+/g, "")
+  const amount = total ? amountInThousands(total) : null
+  if (!creditNoteNumber || !originalInvoiceNumber || amount === null) {
+    throw new Error("No se pudo identificar la nota crédito, la factura original y el total.")
+  }
+
+  const reason =
+    /Observaciones\s*:?\s*([\s\S]*?)(?=\bCUDE\b|\bCUFE\b|$)/i.exec(text)?.[1]?.replace(/\s+/g, " ").trim() ?? ""
+  return {
+    creditNoteNumber,
+    originalInvoiceNumber,
+    creditNoteDate: findDate(text, "Fecha Nota Crédito"),
+    reason,
+    amount,
   }
 }

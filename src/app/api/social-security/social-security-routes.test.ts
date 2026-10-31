@@ -77,6 +77,7 @@ describe("social-security routes", () => {
         grossAmount: 47_445.123,
         discounts: 16_824.665,
         netAmount: 30_620.458,
+        ibcIncludedNetAmount: 30_620.458,
         ibcAmount: 12_248.183,
         solidarityAmount: 122.5,
       },
@@ -88,6 +89,7 @@ describe("social-security routes", () => {
             gte: new Date("2026-09-01T00:00:00.000Z"),
             lt: new Date("2026-10-01T00:00:00.000Z"),
           },
+          status: { not: "ANULADA" },
         },
       }),
     )

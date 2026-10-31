@@ -7,6 +7,7 @@ type Period = {
   grossAmount: number
   discounts: number
   netAmount: number
+  ibcIncludedNetAmount: number
   ibcAmount: number
   healthAmount: number
   pensionAmount: number
@@ -107,8 +108,12 @@ export function SocialSecurityManager({ month, refreshToken }: { month: string; 
               <dd>{formatAmount(result.period.discounts)}</dd>
             </div>
             <div>
-              <dt>Neto facturado</dt>
+              <dt>Neto total facturado</dt>
               <dd>{formatAmount(result.period.netAmount)}</dd>
+            </div>
+            <div>
+              <dt>Neto incluido en IBC</dt>
+              <dd>{formatAmount(result.period.ibcIncludedNetAmount)}</dd>
             </div>
             <div>
               <dt>IBC</dt>

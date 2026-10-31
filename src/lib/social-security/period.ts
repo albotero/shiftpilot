@@ -54,6 +54,7 @@ export function calculateSocialSecurityPeriod(
     grossAmount,
     discounts,
     netAmount,
+    ibcIncludedNetAmount: ibcNetAmount,
     ibcAmount,
     configuration,
     rates,
@@ -76,8 +77,14 @@ export async function recalculateSocialSecurityPeriod(
   const nextMonth = new Date(Date.UTC(monthStart.getUTCFullYear(), monthStart.getUTCMonth() + 1, 1))
   const [invoices, settingRecords, existingPeriod] = await Promise.all([
     database.invoice.findMany({
-      where: { serviceDate: { gte: monthStart, lt: nextMonth } },
-      select: { grossAmount: true, discountAmount: true, shiftDiscountAmount: true, netAmount: true, includeInIbc: true },
+      where: { serviceDate: { gte: monthStart, lt: nextMonth }, status: { not: "ANULADA" } },
+      select: {
+        grossAmount: true,
+        discountAmount: true,
+        shiftDiscountAmount: true,
+        netAmount: true,
+        includeInIbc: true,
+      },
     }),
     database.appSetting.findMany({ where: { key: { startsWith: "socialSecurity." } } }),
     database.socialSecurityPeriod.findUnique({ where: { month: monthStart } }),
@@ -131,7 +138,7 @@ export async function recalculateSocialSecurityPeriod(
     periodMinimumWage.amount,
     savedRates,
   )
-  const { rates, configuration: savedConfiguration, ...amounts } = calculated
+  const { rates, configuration: savedConfiguration, ibcIncludedNetAmount, ...amounts } = calculated
   const snapshot = {
     ...amounts,
     minimumWageAmount: periodMinimumWage.amount,
@@ -164,6 +171,7 @@ export async function recalculateSocialSecurityPeriod(
       grossAmount: Number(record.grossAmount),
       discounts: Number(record.discounts),
       netAmount: Number(record.netAmount),
+      ibcIncludedNetAmount,
       ibcAmount: Number(record.ibcAmount),
       healthAmount: Number(record.healthAmount),
       pensionAmount: Number(record.pensionAmount),

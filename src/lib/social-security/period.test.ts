@@ -51,6 +51,7 @@ describe("monthly social security period", () => {
       grossAmount: 15_000,
       discounts: 1_500,
       netAmount: 13_500,
+      ibcIncludedNetAmount: 9_000,
       ibcAmount: 3_600,
     })
   })
@@ -88,6 +89,7 @@ describe("monthly social security period", () => {
       grossAmount: 47_445.123,
       discounts: 16_824.665,
       netAmount: 30_620.458,
+      ibcIncludedNetAmount: 30_620.458,
       ibcAmount: 12_248.183,
       configuration: DEFAULT_SOCIAL_SECURITY_CONFIGURATION,
       rates: {
@@ -114,6 +116,7 @@ describe("monthly social security period", () => {
       grossAmount: 0,
       discounts: 0,
       netAmount: 0,
+      ibcIncludedNetAmount: 0,
       ibcAmount: 1_750.905,
       configuration: DEFAULT_SOCIAL_SECURITY_CONFIGURATION,
       rates: expect.objectContaining({ solidarityRatePpm: 0 }),
@@ -172,8 +175,15 @@ describe("monthly social security period", () => {
           gte: new Date("2026-09-01T00:00:00.000Z"),
           lt: new Date("2026-10-01T00:00:00.000Z"),
         },
+        status: { not: "ANULADA" },
       },
-      select: { grossAmount: true, discountAmount: true, shiftDiscountAmount: true, netAmount: true, includeInIbc: true },
+      select: {
+        grossAmount: true,
+        discountAmount: true,
+        shiftDiscountAmount: true,
+        netAmount: true,
+        includeInIbc: true,
+      },
     })
     expect(database.socialSecurityPeriod.upsert).toHaveBeenCalledTimes(2)
     expect(database.socialSecurityPeriod.upsert).toHaveBeenNthCalledWith(

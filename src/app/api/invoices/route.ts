@@ -8,6 +8,8 @@ import {
 } from "@/lib/billing/invoice-service"
 import { DEFAULT_BILLING_SETTINGS, type BillingSettings } from "@/lib/billing/calculations"
 import { addMoney, assertMoneyAmount } from "@/lib/money/integer"
+import { isInstitutionIncludedInIbc } from "@/lib/billing/ibc-institutions"
+import { normalizeInvoiceNumber } from "@/lib/billing/invoice-identifiers"
 import { recalculateSocialSecurityPeriod } from "@/lib/social-security/period"
 import { getMinimumWageForYear, type MinimumWageSnapshot } from "@/lib/social-security/minimum-wage"
 import { prisma } from "@/server/db"
@@ -30,6 +32,7 @@ function mapInvoice(invoice: InvoiceWithItems) {
     serviceDate: dateKey(invoice.serviceDate),
     invoiceDate: dateKey(invoice.invoiceDate),
     invoiceNumber: invoice.invoiceNumber,
+    institutionName: invoice.institutionName,
     expectedPaymentDate: dateKey(invoice.expectedPaymentDate),
     pdfTotalAmount: invoice.pdfTotalAmount === null ? null : Number(invoice.pdfTotalAmount),
     grossAmount: Number(invoice.grossAmount),
@@ -42,6 +45,7 @@ function mapInvoice(invoice: InvoiceWithItems) {
     status: invoice.status,
     paidAt: dateKey(invoice.paidAt),
     notes: invoice.notes,
+    creditNotes: Array.isArray(invoice.creditNotes) ? invoice.creditNotes : [],
     items: invoice.items.map((item) => ({
       id: item.id,
       description: item.description,
@@ -56,7 +60,16 @@ function mapInvoice(invoice: InvoiceWithItems) {
 async function getBillingSettings(database: BillingSettingsDatabase = prisma) {
   const records = await database.appSetting.findMany({ where: { key: { startsWith: "billing." } } })
   const values: Record<string, number> = {}
+  let includedIbcInstitutions: string[] = []
   for (const record of records) {
+    if (record.key === "billing.ibc.includedInstitutions") {
+      if (Array.isArray(record.value)) {
+        includedIbcInstitutions = record.value.filter(
+          (institution): institution is string => typeof institution === "string" && institution.trim().length > 0,
+        )
+      }
+      continue
+    }
     if (typeof record.value !== "number" || record.value < 0) continue
     if (record.key === "billing.particular.shiftAmount") {
       try {
@@ -77,7 +90,7 @@ async function getBillingSettings(database: BillingSettingsDatabase = prisma) {
     ),
     privateShiftAmount: setting("billing.particular.shiftAmount", DEFAULT_BILLING_SETTINGS.privateShiftAmount),
   }
-  return { values, calculationSettings }
+  return { values, calculationSettings, includedIbcInstitutions }
 }
 
 async function buildInvoiceData(
@@ -100,15 +113,15 @@ async function buildInvoiceData(
     serviceDate: new Date(`${input.serviceDate}T00:00:00.000Z`),
     invoiceDate: input.invoiceDate ? new Date(`${input.invoiceDate}T00:00:00.000Z`) : null,
     invoiceNumber: input.invoiceNumber || null,
+    institutionName: input.institutionName || null,
     expectedPaymentDate: new Date(`${input.expectedPaymentDate ?? dueDate}T00:00:00.000Z`),
     pdfTotalAmount: input.pdfTotalAmount ?? null,
     grossAmount: totals.grossAmount,
     discountAmount: totals.discountAmount,
     shiftDiscountAmount: totals.shiftDiscountAmount,
     netAmount: totals.netAmount,
-    ...(!replaceItems || input.includeInIbc !== undefined
-      ? { includeInIbc: input.includeInIbc ?? false }
-      : {}),
+    includeInIbc:
+      input.includeInIbc ?? isInstitutionIncludedInIbc(input.institutionName, settings.includedIbcInstitutions),
     privateShiftCount: input.type === "SOMA_PARTICULAR" ? (input.privateShiftCount ?? 0) : 0,
     privateShiftAmount: totals.privateShiftAmount,
     status: input.status,
@@ -152,9 +165,13 @@ function isMissingRecord(error: unknown) {
 
 export async function GET(request: Request) {
   const month = new URL(request.url).searchParams.get("month")
-  const includeMeta = new URL(request.url).searchParams.get("includeMeta") === "true"
+  const search = new URL(request.url).searchParams
+  const invoiceNumber = search.get("number")?.trim() || null
+  const includeMeta = search.get("includeMeta") === "true"
   let where: Prisma.InvoiceWhereInput = {}
-  if (month) {
+  if (invoiceNumber) {
+    where = { invoiceNumber: { not: null } }
+  } else if (month) {
     if (!/^\d{4}-\d{2}$/.test(month)) return Response.json({ error: "Mes inválido" }, { status: 400 })
     const [year, monthNumber] = month.split("-").map(Number)
     if (year < 1900 || year > 9998 || monthNumber < 1 || monthNumber > 12) {
@@ -177,7 +194,13 @@ export async function GET(request: Request) {
       }),
       includeMeta ? getBillingSettings() : Promise.resolve(null),
     ])
-    const invoices = records.map(mapInvoice)
+    const invoices = records
+      .filter(
+        (invoice) =>
+          !invoiceNumber ||
+          normalizeInvoiceNumber(invoice.invoiceNumber ?? "") === normalizeInvoiceNumber(invoiceNumber),
+      )
+      .map(mapInvoice)
     if (!settings) return Response.json(invoices)
 
     return Response.json({
@@ -189,9 +212,12 @@ export async function GET(request: Request) {
         SOMA_PARTICULAR: getInvoicePaymentDays("SOMA_PARTICULAR", settings.values),
         SEDARTE: getInvoicePaymentDays("SEDARTE", settings.values),
       },
+      includedIbcInstitutions: settings.includedIbcInstitutions,
       summary: {
-        count: invoices.length,
-        netAmount: addMoney(...invoices.map((invoice) => invoice.netAmount)),
+        count: invoices.filter((invoice) => invoice.status !== "ANULADA").length,
+        netAmount: addMoney(
+          ...invoices.filter((invoice) => invoice.status !== "ANULADA").map((invoice) => invoice.netAmount),
+        ),
       },
     })
   } catch {
@@ -231,12 +257,7 @@ export async function PATCH(request: Request) {
   } catch {
     body = null
   }
-  if (
-    typeof body === "object" &&
-    body !== null &&
-    "includeInIbc" in body &&
-    !("type" in body)
-  ) {
+  if (typeof body === "object" && body !== null && "includeInIbc" in body && !("type" in body)) {
     const parsedToggle = z.object({ id: z.string().min(1), includeInIbc: z.boolean() }).safeParse(body)
     if (!parsedToggle.success) {
       return Response.json({ error: "Opción de inclusión en IBC inválida" }, { status: 400 })

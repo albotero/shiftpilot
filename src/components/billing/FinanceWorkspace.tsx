@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { format } from "date-fns"
 import { InvoiceManager } from "@/components/billing/InvoiceManager"
+import { InvoiceEntitySummary } from "@/components/billing/InvoiceEntitySummary"
 import { SocialSecurityManager } from "@/components/billing/SocialSecurityManager"
 import { PageHeading } from "@/components/dashboard/PageHeading"
 
@@ -44,6 +45,7 @@ export function FinanceWorkspace() {
         onMonthChange={setMonth}
         onInvoicesChanged={() => setInvoiceRevision((revision) => revision + 1)}
       />
+      <InvoiceEntitySummary month={month} refreshToken={invoiceRevision} />
       <SocialSecurityManager month={month} refreshToken={invoiceRevision} />
     </>
   )
